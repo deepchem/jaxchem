@@ -1,4 +1,4 @@
-FROM nvidia/cuda:10.0-cudnn7-runtime
+FROM nvidia/cuda:10.1-cudnn7-devel
 
 # Install some utilities
 RUN apt-get update && \
@@ -13,26 +13,32 @@ RUN MINICONDA="Miniconda3-latest-Linux-x86_64.sh" && \
     echo ". /miniconda/etc/profile.d/conda.sh" >> ~/.bashrc
 ENV PATH /miniconda/bin:$PATH
 
-SHELL ["/bin/bash", "-l", "-c"]
-
 # install deepchem with master branch
 RUN conda update -n base conda && \
-    git clone --depth=1 https://github.com/deepchem/deepchem.git && \
+    git clone https://github.com/deepchem/deepchem.git && \
     cd deepchem && \
+    . /miniconda/etc/profile.d/conda.sh && \
+    conda init bash && \
     gpu=1 bash scripts/install_deepchem_conda.sh deepchem && \
-    source activate deepchem && python setup.py install
+    conda activate deepchem && \
+    python setup.py install && \
+    conda clean -afy
 
 # install jax
-RUN source activate deepchem && \
+RUN . /miniconda/etc/profile.d/conda.sh && \
+    conda activate deepchem && \
     PYTHON_VERSION=cp36 && \
-    CUDA_VERSION=cuda100 && \
+    CUDA_VERSION=cuda101 && \
     PLATFORM=linux_x86_64 && \
     BASE_URL='https://storage.googleapis.com/jax-releases' && \
     pip install --upgrade $BASE_URL/$CUDA_VERSION/jaxlib-0.1.47-$PYTHON_VERSION-none-$PLATFORM.whl && \
     pip install --upgrade jax
 
 # install additonal package
-RUN source activate deepchem && \
-    yes | pip install flake8 autopep8 torch torchvision
+RUN . /miniconda/etc/profile.d/conda.sh && \
+    conda activate deepchem && \
+    yes | pip install flake8 autopep8 torch torchvision && \
+    rm -rf ~/.cache/pip
 
-WORKDIR /root
+RUN echo "conda activate deepchem" >> ~/.bashrc
+WORKDIR /root/mydir

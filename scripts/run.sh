@@ -1,4 +1,4 @@
 docker run --name test \
             --rm \
-            -v $(pwd):/root \
+            -v $(pwd):/root/mydir \
             -it jaxchem
