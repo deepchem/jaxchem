@@ -77,12 +77,13 @@ def GCN(hidden_feats, activation=None, batchnorm=None, dropout=None,
     sparse : bool
         Whether to use the matrix multiplication method for sparse matrix,  default to be False.
     """
+    layer_num = len(hidden_feats)
     if activation is None:
-        activation = [relu for _ in range(len(hidden_feats))]
+        activation = [relu for _ in range(layer_num)]
     if batchnorm is None:
-        batchnorm = [False for _ in range(len(hidden_feats))]
+        batchnorm = [False for _ in range(len(layer_num))]
     if dropout is None:
-        dropout = [0.0 for _ in range(len(hidden_feats))]
+        dropout = [0.0 for _ in range(len(layer_num))]
 
     lengths = [len(hidden_feats), len(activation),
                len(batchnorm), len(dropout)]
@@ -91,30 +92,27 @@ def GCN(hidden_feats, activation=None, batchnorm=None, dropout=None,
         'batchnorm and dropout to be the same, ' \
         'got {}'.format(lengths)
 
-    # initialize GCN layer
-    gcn_init_funcs = []
-    gcn_funcs = []
-    for (out_dim, act, bnorm) in zip(hidden_feats, activation):
-        gcn_init, gcn_fun = GCNLayer(out_dim, activation=act, bias=bias, sparse=sparse)
-        gcn_init_funcs.append(gcn_init)
-        gcn_funcs.append(gcn_fun)
-
-    # # initialize batchorm layer
-    batchnorm_init_funcs = [None for _ in range(len(hidden_feats))]
-    batchnorm_funcs = [None for _ in range(len(hidden_feats))]
-    for i, is_batchnorm in enumerate(batchnorm):
-        if is_batchnorm:
-            batchnorm_init, batchnorm_fun = BatchNorm()
-            batchnorm_init_funcs[i] = batchnorm_init
-            batchnorm_funcs[i] = batchnorm_fun
+    # initialize layer
+    gcn_init_funcs = [None for _ in range(layer_num)]
+    gcn_funcs = [None for _ in range(layer_num)]
+    batchnorm_init_funcs = [None for _ in range(layer_num)]
+    batchnorm_funcs = [None for _ in range(layer_num)]
+    drop_funcs = [None for _ in range(layer_num)]
+    for i, (out_dim, act, bnorm, rate) in enumerate(zip(hidden_feats, activation, batchnorm, dropout)):
+        gcn_init_funcs[i], gcn_funcs[i] = GCNLayer(out_dim, activation=act, bias=bias, sparse=sparse)
+        if bnorm:
+            batchnorm_init_funcs[i], batchnorm_funcs[i] = BatchNorm()
+        if rate != 0.0:
+            _, drop_func = Dropout(rate)
+            drop_funcs[i] = drop_func
 
     def init_fun(rng, input_shape):
-        gcn_params = []
-        batchnorm_prams = [None for _ in range(len(hidden_feats))]
-        for i in range(len(hidden_feats)):
+        gcn_params = [None for _ in range(layer_num)]
+        batchnorm_prams = [None for _ in range(layer_num)]
+        for i in range(layer_num):
             rng, gcn_rng = random.split(rng)
             input_shape, gcn_param = gcn_init_funcs[i](gcn_rng, input_shape)
-            gcn_params.append(gcn_param)
+            gcn_params[i] = gcn_param
             if batchnorm[i]:
                 rng, batchnorm_rng = random.split(rng)
                 input_shape, batchnorm_param = \
@@ -125,15 +123,15 @@ def GCN(hidden_feats, activation=None, batchnorm=None, dropout=None,
     def apply_fun(params, x, adj, mode='train', **kwargs):
         rng = kwargs.pop('rng', None)
         gcn_params, batchnorm_prams = params
-        for i in range(len(hidden_feats)):
+        for i in range(layer_num):
             rng, k = random.split(rng)
             x = gcn_funcs[i](gcn_params[i], x, adj, rng=k)
             if batchnorm[i]:
-                x = batchnorm_funcs[i](x)
+                rng, k = random.split(rng)
+                x = batchnorm_funcs[i](batchnorm_prams[i], x, rng=k)
             if dropout[i] != 0.0:
                 rng, k = random.split(rng)
-                _, drop_fun = Dropout(dropout[i])
-                x = drop_fun(x, mode, rng=k)
+                x = drop_funcs[i](x, mode, rng=k)
         return x
 
     return init_fun, apply_fun
