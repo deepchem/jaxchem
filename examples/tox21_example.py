@@ -1,17 +1,21 @@
+import os
 import time
+import random
 import argparse
 import itertools
 
 
 import numpy as np
 import jax.numpy as jnp
-from jax import grad, jit, nn, random
+import jax.random as jrandom
+from jax import grad, jit
 from jax.experimental import optimizers
 from sklearn.metrics import roc_auc_score
 
 
 from deepchem.molnet import load_tox21
-from jaxchem.models import GCNPredicator
+from jaxchem.models import GCNPredicator, clipped_sigmoid
+from jaxchem.utils import EarlyStopping
 
 
 task_names = ['NR-AR', 'NR-AR-LBD', 'NR-AhR', 'NR-Aromatase', 'NR-ER', 'NR-ER-LBD',
@@ -29,6 +33,12 @@ def parse_arguments():
     return parser.parse_args()
 
 
+def seed_everything(seed):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+
+
 def collate_fn(original_batch, task_index, rng, is_train):
     """Make a correct batch as GCN model inputs"""
     # convert a batch returned by iterbatches to a correct batch as model inputs
@@ -39,25 +49,17 @@ def collate_fn(original_batch, task_index, rng, is_train):
     return (node_feats, adj, rng, is_train, targets)
 
 
-def clipped_sigmoid(x):
-    """Customized sigmoid function to avoid an overflow"""
-    # x is clipped because nn.sigmoid sometimes get overflow and return nan
-    # restrict domain of sigmoid function within [1e-15, 1 - 1e-15]
-    sigmoid_range = 34.538776394910684
-    x = jnp.clip(x, -sigmoid_range, sigmoid_range)
-    logits = nn.sigmoid(x)
-    return logits
-
-
 def main():
     args = parse_arguments()
+    # fix seed
+    seed_everything(args.seed)
 
     # load tox21 dataset
     tox21_tasks, tox21_datasets, _ = load_tox21(featurizer='AdjacencyConv', reload=True)
     train_dataset, valid_dataset, test_dataset = tox21_datasets
 
     # define hyperparams
-    rng = random.PRNGKey(args.seed)
+    rng = jrandom.PRNGKey(args.seed)
     # model params
     hidden_feats = [64, 64, 64]
     activation, batchnorm, dropout = None, None, None  # use default
@@ -69,7 +71,7 @@ def main():
     num_epochs = args.epochs
     batch_size = args.batch_size
     task = args.task
-    early_stop = args.early_stop
+    early_stop_patience = args.early_stop
 
     # setup model
     init_fun, predict_fun = \
@@ -78,7 +80,7 @@ def main():
                       predicator_dropout=predicator_dropout, n_out=n_out)
 
     # init params
-    rng, init_key = random.split(rng)
+    rng, init_key = jrandom.split(rng)
     sample_node_feat = train_dataset.X[0][1]
     input_shape = sample_node_feat.shape
     _, init_params = init_fun(init_key, input_shape)
@@ -111,12 +113,12 @@ def main():
     print("Starting training...")
     task_index = tox21_tasks.index(task)
     itercount = itertools.count()
-    best_score, early_stop_cnt = 0, 0
+    early_stop = EarlyStopping(patience=early_stop_patience)
     for epoch in range(num_epochs):
         # train
         start_time = time.time()
         for original_batch in train_dataset.iterbatches(batch_size=batch_size):
-            rng, key = random.split(rng)
+            rng, key = jrandom.split(rng)
             batch = collate_fn(original_batch, task_index, key, True)
             opt_state = update(next(itercount), opt_state, batch)
         epoch_time = time.time() - start_time
@@ -125,7 +127,7 @@ def main():
         params = get_params(opt_state)
         y_score, y_true, valid_loss = [], [], []
         for original_batch in valid_dataset.iterbatches(batch_size=batch_size):
-            rng, key = random.split(rng)
+            rng, key = jrandom.split(rng)
             batch = collate_fn(original_batch, task_index, key, False)
             y_score.extend(predict(params, batch[:-1]))
             y_true.extend(batch[-1])
@@ -135,23 +137,19 @@ def main():
         # log
         print(f"Iter {epoch}/{num_epochs} ({epoch_time:.4f} s) valid loss: {np.mean(valid_loss):.4f} \
             valid roc_auc score: {score:.4f}")
-        # early stopping
-        if score > best_score:
-            best_score = score
-            early_stop_cnt = 0
-        else:
-            early_stop_cnt += 1
-            if early_stop_cnt >= early_stop:
-                print("Early stopping...")
-                break
+        # early stopping and save best params
+        early_stop(score, params)
+        if early_stop.is_train_stop:
+            print("Early stopping...")
+            break
 
     # test
-    params = get_params(opt_state)
     y_score, y_true = [], []
+    best_params = early_stop.best_params
     for original_batch in test_dataset.iterbatches(batch_size=batch_size):
-        rng, key = random.split(rng)
+        rng, key = jrandom.split(rng)
         batch = collate_fn(original_batch, task_index, key, False)
-        y_score.extend(predict(params, batch[:-1]))
+        y_score.extend(predict(best_params, batch[:-1]))
         y_true.extend(batch[-1])
     score = roc_auc_score(y_true, y_score)
     print(f'Test roc_auc score: {score:.4f}')

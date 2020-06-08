@@ -2,7 +2,10 @@ import jax.numpy as jnp
 from jax import random, vmap
 from jax.nn import relu
 from jax.nn.initializers import he_normal, normal
-from jax.experimental.stax import BatchNorm, Dropout
+from jax.experimental.stax import BatchNorm
+
+
+from jaxchem.models import Dropout
 
 
 def GCNLayer(out_dim, activation=relu, bias=True, sparse=False,
@@ -45,8 +48,9 @@ def GCNLayer(out_dim, activation=relu, bias=True, sparse=False,
         k1, k2, k3 = random.split(rng, 3)
         W = W_init(k1, (input_shape[-1], out_dim))
         b = b_init(k2, (out_dim,)) if bias else None
-        # TODO: maybe incorrect dim
-        batch_norm_param = batch_norm_init(k3, output_shape) if batch_norm else None
+        batch_norm_param = None
+        if batch_norm:
+            output_shape, batch_norm_param = batch_norm_init(k3, output_shape)
         return output_shape, (W, b, batch_norm_param)
 
     def apply_fun(params, node_feats, adj, rng, is_train=True):
@@ -63,10 +67,9 @@ def GCNLayer(out_dim, activation=relu, bias=True, sparse=False,
         out = activation(out)
         if dropout != 0.0:
             rng, k = random.split(rng)
-            mode = 'train' if is_train else 'inference'
-            out = drop_fun(out, mode, rng=k)
+            out = drop_fun(None, out, is_train, rng=k)
         if batch_norm:
-            out = batch_norm_fun(out)
+            out = batch_norm_fun(batch_norm_param, out)
         return out
 
     return init_fun, apply_fun

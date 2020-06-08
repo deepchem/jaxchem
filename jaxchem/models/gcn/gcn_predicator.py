@@ -1,9 +1,9 @@
 import jax.numpy as jnp
 from jax import random
-from jax.experimental.stax import Dense, Dropout, Relu, serial
+from jax.experimental.stax import Dense, Relu, serial
 
 
-from jaxchem.models import GCN
+from jaxchem.models import GCN, Dropout
 
 
 def GCNPredicator(hidden_feats, activation=None, batchnorm=None, dropout=None,
@@ -63,8 +63,7 @@ def GCNPredicator(hidden_feats, activation=None, batchnorm=None, dropout=None,
         # mean pooling
         graph_feat = jnp.mean(node_feats, axis=1)
         if predicator_dropout != 0.0:
-            mode = 'train' if is_train else 'inference'
-            graph_feat = drop_fun(graph_feat, mode, rng=dropout_rng)
+            graph_feat = drop_fun(None, graph_feat, is_train, rng=dropout_rng)
         out = dnn_fun(dnn_param, graph_feat)
         return out
 
