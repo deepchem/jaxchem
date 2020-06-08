@@ -9,8 +9,7 @@ from jaxchem.models import GCN, Dropout
 def GCNPredicator(hidden_feats, activation=None, batchnorm=None, dropout=None,
                   predicator_hidden_feats=64, predicator_dropout=None,
                   n_out=1, bias=True, sparse=False):
-    r"""GCN `Semi-Supervised Classification with Graph Convolutional Networks
-    <https://arxiv.org/abs/1609.02907>`__
+    r"""GCN Predicator is a wrapper function using GCN and MLP.
 
     Parameters
     ----------
@@ -28,8 +27,8 @@ def GCNPredicator(hidden_feats, activation=None, batchnorm=None, dropout=None,
         performed for all layers.
     predicator_hidden_feats : int
         Size of hidden graph representations in the predicator, default to 128.
-    predicator_dropout : float
-        The probability for dropout in the predicator, default to 0.
+    predicator_dropout : float or None
+        The probability for dropout in the predicator, default to None.
     n_out : int
         Number of the output size, default to 1.
     bias : bool
@@ -51,14 +50,55 @@ def GCNPredicator(hidden_feats, activation=None, batchnorm=None, dropout=None,
     dnn_init, dnn_fun = serial(*dnn_layers)
 
     def init_fun(rng, input_shape):
-        rng, gcn_rng, dnn_rng = random.split(rng, 3)
-        input_shape, gcn_param = gcn_init(gcn_rng, input_shape)
-        input_shape, dnn_param = dnn_init(dnn_rng, input_shape)
-        return input_shape, (gcn_param, dnn_param)
+        """Initialize parameters.
 
-    def apply_fun(params, node_feats, adj, rng, is_train=True):
+        Parameters
+        ----------
+        rng : PRNGKey
+        input_shape :  (batch_size, N, M1)
+            The shape of input (input node features).
+            N is the total number of nodes in the batch of graphs.
+            M1 is the input node feature size.
+
+        Returns
+        -------
+        output_shape : (batch_size, M4)
+            The shape of output.
+            M4 is the output size of GCNPredicator and equal to n_out.
+        params: Tuple (gcn_param, dnn_param)
+            gcn_param is all parameters of GCN.
+            dnn_param is all parameters of full connected layer.
+        """
+        output_shape = input_shape
+        rng, gcn_rng, dnn_rng = random.split(rng, 3)
+        output_shape, gcn_param = gcn_init(gcn_rng, output_shape)
+        output_shape, dnn_param = dnn_init(dnn_rng, output_shape)
+        return output_shape, (gcn_param, dnn_param)
+
+    def apply_fun(params, node_feats, adj, rng, is_train):
+        """Define forward computation function.
+
+        Parameters
+        ----------
+        node_feats : ndarray of shape (batch_size, N, M1)
+            Batched input node features.
+            N is the total number of nodes in the batch of graphs.
+            M1 is the input node feature size.
+        adj : ndarray of shape (batch_size, N, N)
+            Batched adjacency matrix.
+        rng : PRNGKey
+            rng is a value for generating random values
+        is_train : bool
+            Whether the model is training or not.
+
+        Returns
+        -------
+        out : ndarray of shape (batch_size, M4)
+            The shape of output.
+            M4 is the output size of GCNPredicator and equal to n_out.
+        """
         gcn_param, dnn_param = params
-        rng, gcn_rng, dnn_rng, dropout_rng = random.split(rng, 4)
+        rng, gcn_rng, dropout_rng = random.split(rng, 3)
         node_feats = gcn_fun(gcn_param, node_feats, adj, gcn_rng, is_train)
         # mean pooling
         graph_feat = jnp.mean(node_feats, axis=1)

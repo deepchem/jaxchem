@@ -3,7 +3,7 @@ from jax import nn
 
 
 def clipped_sigmoid(x):
-    """Customized sigmoid function to avoid an overflow
+    """Customize sigmoid function to avoid an overflow.
 
     Parameters
     ----------

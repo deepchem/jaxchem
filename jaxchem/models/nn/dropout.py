@@ -25,6 +25,24 @@ def Dropout(rate):
         return input_shape, ()
 
     def apply_fun(params, inputs, is_train, **kwargs):
+        """Update node representations.
+
+        Parameters
+        ----------
+        params : None
+            There is no params for Dropout
+        inputs : ndarray of shape
+            The input for Dropout.
+        is_train : bool
+            Whether the model is training or not.
+        rng : PRNGKey
+            rng is a value for generating random values. Dropout must require rng.
+
+        Returns
+        -------
+        out : ndarray of shape
+            The output for Dropout. The shape is equal to the shape of inputs
+        """
         rng = kwargs.get('rng', None)
         if rng is None:
             msg = ("Dropout layer requires apply_fun to be called with a PRNG key "
@@ -33,8 +51,9 @@ def Dropout(rate):
                    "jax.random.PRNGKey value.")
             raise ValueError(msg)
         if is_train is True:
-            keep = random.bernoulli(rng, rate, inputs.shape)
-            return jnp.where(keep, inputs / rate, 0)
+            keep_rate = 1 - rate
+            keep = random.bernoulli(rng, keep_rate, inputs.shape)
+            return jnp.where(keep, inputs / keep_rate, 0)
         else:
             return inputs
     return init_fun, apply_fun
