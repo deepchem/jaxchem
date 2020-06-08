@@ -1,11 +1,8 @@
 import jax.numpy as jnp
-from jax import random
+from jax import random, vmap
 from jax.nn import relu
 from jax.nn.initializers import he_normal, normal
 from jax.experimental.stax import BatchNorm, Dropout
-
-
-from jaxchem.utils import sparse_matmul
 
 
 def GCNLayer(out_dim, activation=relu, bias=True, sparse=False,
@@ -43,13 +40,6 @@ def GCNLayer(out_dim, activation=relu, bias=True, sparse=False,
     _, drop_fun = Dropout(dropout)
     batch_norm_init, batch_norm_fun = BatchNorm()
 
-    def _matmul(A, B, shape):
-        if sparse:
-            # FIXME : TypeError: 'module' object is not callable
-            return sparse_matmul(A, B, shape)
-        else:
-            return jnp.matmul(A, B)
-
     def init_fun(rng, input_shape):
         output_shape = input_shape[:-1] + (out_dim,)
         k1, k2, k3 = random.split(rng, 3)
@@ -61,8 +51,13 @@ def GCNLayer(out_dim, activation=relu, bias=True, sparse=False,
 
     def apply_fun(params, node_feats, adj, rng, is_train=True):
         W, b, batch_norm_param = params
-        support = jnp.dot(node_feats, W)
-        out = _matmul(adj, support, support.shape[0])
+
+        # H' = A × H × W
+        def node_update_func(node_feats, adj):
+            return jnp.matmul(adj, jnp.dot(node_feats, W))
+        # batched operation for updating node features
+        out = vmap(node_update_func)(node_feats, adj)
+
         if bias:
             out += b
         out = activation(out)

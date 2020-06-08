@@ -45,8 +45,8 @@ def GCNPredicator(hidden_feats, activation=None, batchnorm=None, dropout=None,
         Defines the forward computation function.
     """
     gcn_init, gcn_fun = GCN(hidden_feats, activation, batchnorm, dropout, bias, sparse)
-    classifier_dropout = 0.0 if predicator_dropout is None else predicator_dropout
-    _, drop_fun = Dropout(classifier_dropout)
+    predicator_dropout = 0.0 if predicator_dropout is None else predicator_dropout
+    _, drop_fun = Dropout(predicator_dropout)
     dnn_layers = [Dense(predicator_hidden_feats), Relu, Dense(n_out)]
     dnn_init, dnn_fun = serial(*dnn_layers)
 
@@ -61,8 +61,8 @@ def GCNPredicator(hidden_feats, activation=None, batchnorm=None, dropout=None,
         rng, gcn_rng, dnn_rng, dropout_rng = random.split(rng, 4)
         node_feats = gcn_fun(gcn_param, node_feats, adj, gcn_rng, is_train)
         # mean pooling
-        graph_feat = jnp.mean(node_feats, axis=0)
-        if classifier_dropout != 0.0:
+        graph_feat = jnp.mean(node_feats, axis=1)
+        if predicator_dropout != 0.0:
             mode = 'train' if is_train else 'inference'
             graph_feat = drop_fun(graph_feat, mode, rng=dropout_rng)
         out = dnn_fun(dnn_param, graph_feat)
