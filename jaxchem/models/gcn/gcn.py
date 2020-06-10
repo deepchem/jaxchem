@@ -2,7 +2,7 @@ from jax import random
 from jax.nn import relu
 
 
-from jaxchem.models import GCNLayer
+from jaxchem.models.gcn.gcn_layer import GCNLayer
 
 
 def GCN(hidden_feats, activation=None, batchnorm=None, dropout=None,

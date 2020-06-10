@@ -3,7 +3,8 @@ from jax import random
 from jax.experimental.stax import Dense, Relu, serial
 
 
-from jaxchem.models import GCN, Dropout
+from jaxchem.models.gcn.gcn import GCN
+from jaxchem.models.nn.dropout import Dropout
 
 
 def GCNPredicator(hidden_feats, activation=None, batchnorm=None, dropout=None,

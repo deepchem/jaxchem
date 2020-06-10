@@ -5,7 +5,7 @@ from jax.nn.initializers import he_normal, normal
 from jax.experimental.stax import BatchNorm
 
 
-from jaxchem.models import Dropout
+from jaxchem.models.nn.dropout import Dropout
 
 
 def GCNLayer(out_dim, activation=relu, bias=True, sparse=False,
