@@ -24,7 +24,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install -r requirements-test.txt
-        python setup.py install
     - name: Build jaxchem
       run: |
         python setup.py install
