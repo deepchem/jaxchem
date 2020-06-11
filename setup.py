@@ -16,11 +16,9 @@ def _parse_requirements(requirements_txt_path):
         return fp.read().splitlines()
 
 
-VERSION = '0.0.1'
-
 setup(
     name='jaxchem',
-    version=VERSION,
+    version=_get_version(),
     url='https://github.com/deepchem/jaxchem',
     maintainer='DeepChem contributors',
     classifiers=[
