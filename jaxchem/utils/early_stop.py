@@ -27,6 +27,15 @@ class EarlyStopping:
         self.is_train_stop = False
 
     def __call__(self, score, params):
+        """Update early stopping counter.
+
+        Parameters
+        ----------
+        score : float
+            validation score per epoch
+        params : ndarray
+            all parameters of each epoch
+        """
         score = score if self.is_greater_better else -score
         if self.best_score is None:
             self.best_score = score
