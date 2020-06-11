@@ -17,13 +17,13 @@ ENV PATH /miniconda/bin:$PATH
 RUN conda update -n base conda && \
     git clone --depth 1 https://github.com/deepchem/deepchem.git && \
     cd deepchem && \
-    rm -rf deepchem/.git && \
     . /miniconda/etc/profile.d/conda.sh && \
     bash scripts/install_deepchem_conda.sh deepchem && \
     conda activate deepchem && \
     python setup.py install && \
     conda clean -afy && \
-    rm -rf ~/.cache/pip
+    rm -rf ~/.cache/pip && \
+    rm -rf .git
 
 # install jax
 RUN . /miniconda/etc/profile.d/conda.sh && \
