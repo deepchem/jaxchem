@@ -6,7 +6,7 @@ from jaxchem.models.gcn.gcn_layer import GCNLayer
 
 
 def GCN(hidden_feats, activation=None, batchnorm=None, dropout=None,
-        bias=True, sparse=False):
+        bias=True, normalize=True):
     r"""GCN `Semi-Supervised Classification with Graph Convolutional Networks
     <https://arxiv.org/abs/1609.02907>`__
 
@@ -26,8 +26,8 @@ def GCN(hidden_feats, activation=None, batchnorm=None, dropout=None,
         performed for all layers.
     bias : bool
         Whether to add bias after affine transformation, default to be True.
-    sparse : bool
-        Whether to use the matrix multiplication method for sparse matrix, default to be False.
+    normalize : bool
+        Whether to normalize the adjacency matrix or not, default to be True.
 
     Returns
     -------
@@ -56,7 +56,7 @@ def GCN(hidden_feats, activation=None, batchnorm=None, dropout=None,
     gcn_funs = [None for _ in range(layer_num)]
     for i, (out_dim, act, bnorm, rate) in enumerate(zip(hidden_feats, activation, batchnorm, dropout)):
         gcn_init_funs[i], gcn_funs[i] = \
-            GCNLayer(out_dim, activation=act, bias=bias, sparse=sparse,
+            GCNLayer(out_dim, activation=act, bias=bias, normalize=normalize,
                      batch_norm=bnorm, dropout=rate)
 
     def init_fun(rng, input_shape):

@@ -9,7 +9,7 @@ from jaxchem.models.nn.dropout import Dropout
 
 def GCNPredicator(hidden_feats, activation=None, batchnorm=None, dropout=None,
                   predicator_hidden_feats=64, predicator_dropout=None,
-                  n_out=1, bias=True, sparse=False):
+                  n_out=1, bias=True, normalize=True):
     r"""GCN Predicator is a wrapper function using GCN and MLP.
 
     Parameters
@@ -34,8 +34,8 @@ def GCNPredicator(hidden_feats, activation=None, batchnorm=None, dropout=None,
         Number of the output size, default to 1.
     bias : bool
         Whether to add bias after affine transformation, default to be True.
-    sparse : bool
-        Whether to use the matrix multiplication method for sparse matrix, default to be False.
+    normalize : bool
+        Whether to normalize the adjacency matrix or not, default to be True.
 
     Returns
     -------
@@ -44,7 +44,7 @@ def GCNPredicator(hidden_feats, activation=None, batchnorm=None, dropout=None,
     apply_fun : Function
         Defines the forward computation function.
     """
-    gcn_init, gcn_fun = GCN(hidden_feats, activation, batchnorm, dropout, bias, sparse)
+    gcn_init, gcn_fun = GCN(hidden_feats, activation, batchnorm, dropout, bias, normalize)
     predicator_dropout = 0.0 if predicator_dropout is None else predicator_dropout
     _, drop_fun = Dropout(predicator_dropout)
     dnn_layers = [Dense(predicator_hidden_feats), Relu, Dense(n_out)]
