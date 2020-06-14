@@ -39,7 +39,7 @@ setup(
         'life-science',
         'drug-discovery',
     ],
-    packages=find_packages(),
+    packages=find_packages(exclude=["tests", "tests.*"]),
     project_urls={
         'Bug Tracker': 'https://github.com/deepchem/jaxchem/issues',
         'Source': 'https://github.com/deepchem/jaxchem',

@@ -15,6 +15,7 @@ def pooling(method='mean'):
     if method == 'mean':
         return lambda node_feats: jnp.mean(node_feats, axis=1)
     elif method == 'sum':
+        # FIXME : When using np.sum, Nan happens...
         return lambda node_feats: jnp.sum(node_feats, axis=1)
     elif method == 'max':
         return lambda node_feats: jnp.max(node_feats, axis=1)
