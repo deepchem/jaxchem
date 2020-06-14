@@ -1,0 +1,25 @@
+import jax.numpy as jnp
+
+
+def pooling(method='mean'):
+    """Pooling function for pad pattern.
+
+    method : str
+        pooling method name
+
+    Returns
+    -------
+    Function
+        This function aggregates node_feats about axis=1
+    """
+    if method == 'mean':
+        return lambda node_feats: jnp.mean(node_feats, axis=1)
+    elif method == 'sum':
+        return lambda node_feats: jnp.sum(node_feats, axis=1)
+    elif method == 'max':
+        return lambda node_feats: jnp.max(node_feats, axis=1)
+    elif method == 'min':
+        return lambda node_feats: jnp.min(node_feats, axis=1)
+    else:
+        raise ValueError("{} is an unsupported pooling method. \
+            Currently, you can only use mean, sum, max and min pooling.")

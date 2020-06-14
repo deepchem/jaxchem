@@ -65,6 +65,7 @@ def main():
     hidden_feats = [64, 64, 64]
     activation, batchnorm, dropout = None, None, None  # use default
     predicator_hidden_feats = 32
+    pooling_method = 'mean'
     predicator_dropout = None  # use default
     n_out = 1  # binary classification
     # training params
@@ -77,7 +78,8 @@ def main():
     # setup model
     init_fun, predict_fun = \
         GCNPredicator(hidden_feats=hidden_feats, activation=activation, batchnorm=batchnorm,
-                      dropout=dropout, predicator_hidden_feats=predicator_hidden_feats,
+                      dropout=dropout, pooling_method=pooling_method,
+                      predicator_hidden_feats=predicator_hidden_feats,
                       predicator_dropout=predicator_dropout, n_out=n_out)
 
     # init params
