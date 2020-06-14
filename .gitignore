@@ -138,6 +138,6 @@ dmypy.json
 cython_debug/
 
 # for my devlopment 
-deepchem
-.python-version
+*.pkl
+*.csv*
 .vscode

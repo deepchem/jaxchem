@@ -1,6 +1,7 @@
 import os
 import time
 import random
+import pickle
 import argparse
 import itertools
 
@@ -29,7 +30,7 @@ def parse_arguments():
     parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--lr', type=float, default=0.001)
-    parser.add_argument('--early_stop', type=int, default=10)
+    parser.add_argument('--early-stop', type=int, default=10)
     return parser.parse_args()
 
 
@@ -64,6 +65,7 @@ def main():
     hidden_feats = [64, 64, 64]
     activation, batchnorm, dropout = None, None, None  # use default
     predicator_hidden_feats = 32
+    pooling_method = 'mean'
     predicator_dropout = None  # use default
     n_out = 1  # binary classification
     # training params
@@ -76,7 +78,8 @@ def main():
     # setup model
     init_fun, predict_fun = \
         GCNPredicator(hidden_feats=hidden_feats, activation=activation, batchnorm=batchnorm,
-                      dropout=dropout, predicator_hidden_feats=predicator_hidden_feats,
+                      dropout=dropout, pooling_method=pooling_method,
+                      predicator_hidden_feats=predicator_hidden_feats,
                       predicator_dropout=predicator_dropout, n_out=n_out)
 
     # init params
@@ -137,8 +140,8 @@ def main():
         # log
         print(f"Iter {epoch}/{num_epochs} ({epoch_time:.4f} s) valid loss: {np.mean(valid_loss):.4f} \
             valid roc_auc score: {score:.4f}")
-        # early stopping and save best params
-        early_stop(score, params)
+        # check early stopping
+        early_stop.update(score, params)
         if early_stop.is_train_stop:
             print("Early stopping...")
             break
@@ -153,6 +156,9 @@ def main():
         y_true.extend(batch[-1])
     score = roc_auc_score(y_true, y_score)
     print(f'Test roc_auc score: {score:.4f}')
+    # save best params
+    with open('./best_params.pkl', 'wb') as f:
+        pickle.dump(best_params, f)
 
 
 if __name__ == "__main__":

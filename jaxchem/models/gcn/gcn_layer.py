@@ -5,10 +5,10 @@ from jax.nn.initializers import he_normal, normal
 from jax.experimental.stax import BatchNorm
 
 
-from jaxchem.models import Dropout
+from jaxchem.models.nn.dropout import Dropout
 
 
-def GCNLayer(out_dim, activation=relu, bias=True, sparse=False,
+def GCNLayer(out_dim, activation=relu, bias=True, normalize=True,
              batch_norm=False, dropout=0.0, W_init=he_normal(), b_init=normal()):
     r"""Single GCN layer from `Semi-Supervised Classification with Graph Convolutional Networks
     <https://arxiv.org/abs/1609.02907>`
@@ -21,8 +21,8 @@ def GCNLayer(out_dim, activation=relu, bias=True, sparse=False,
         activation function, default to be relu function.
     bias : bool
         Whether to add bias after affine transformation, default to be True.
-    sparse : bool
-        Whether to use the matrix multiplication method for sparse matrix, default to be False.
+    normalize : bool
+        Whether to normalize the adjacency matrix or not, default to be True.
     batch_norm : bool
         Whetehr to use BatchNormalization or not, default to be False.
     dropout : float
@@ -99,9 +99,21 @@ def GCNLayer(out_dim, activation=relu, bias=True, sparse=False,
         """
         W, b, batch_norm_param = params
 
-        # H' = A × H × W
-        def node_update_func(node_feats, adj):
-            return jnp.matmul(adj, jnp.dot(node_feats, W))
+        if normalize:
+            # A' = A + I, where I is the identity matrix
+            # D': diagonal node degree matrix of A'
+            # H' = D'^(-1/2) × A' × D'^(-1/2) × H × W
+            def node_update_func(node_feats, adj):
+                adj = adj + jnp.eye(len(adj))
+                deg = jnp.sum(adj, axis=1)
+                deg_mat = jnp.diag(jnp.where(deg > 0, deg**(-0.5), 0))
+                normalized_adj = jnp.dot(deg_mat, jnp.dot(adj, deg_mat))
+                return jnp.dot(normalized_adj, jnp.dot(node_feats, W))
+        else:
+            # H' = A × H × W
+            def node_update_func(node_feats, adj):
+                return jnp.dot(adj, jnp.dot(node_feats, W))
+
         # batched operation for updating node features
         new_node_feats = vmap(node_update_func)(node_feats, adj)
 

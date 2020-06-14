@@ -25,17 +25,29 @@ class EarlyStopping:
         self.best_score = None
         self.best_params = None
         self.is_train_stop = False
+        self.__tmp_best_score = None
 
-    def __call__(self, score, params):
-        score = score if self.is_greater_better else -score
+    def update(self, score, params):
+        """Update early stopping counter.
+
+        Parameters
+        ----------
+        score : float
+            validation score per epoch
+        params : Any
+            all parameters of each epoch
+        """
+        tmp_score = score if self.is_greater_better else -score
         if self.best_score is None:
+            self.__tmp_best_score = tmp_score
             self.best_score = score
             self.best_params = params
-        elif score < self.best_score + self.delta:
+        elif tmp_score < self.__tmp_best_score + self.delta:
             self.counter += 1
             if self.counter >= self.patience:
                 self.is_train_stop = True
         else:
+            self.__tmp_best_score = tmp_score
             self.best_score = score
             self.best_params = params
             self.counter = 0
