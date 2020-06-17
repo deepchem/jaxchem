@@ -1,130 +1,118 @@
+from typing import Optional
+
+import numpy as np
+import haiku as hk
+import jax
 import jax.numpy as jnp
-from jax import random, vmap
-from jax.nn import relu
-from jax.nn.initializers import he_normal, normal
-from jax.experimental.stax import BatchNorm
 
 
-from jaxchem.models.nn.dropout import Dropout
-
-
-def GCNLayer(out_dim, activation=relu, bias=True, normalize=True,
-             batch_norm=False, dropout=0.0, W_init=he_normal(), b_init=normal()):
-    r"""Single GCN layer from `Semi-Supervised Classification with Graph Convolutional Networks
-    <https://arxiv.org/abs/1609.02907>`
-
-    Parameters
-    ----------
-    out_dim : int
-        Number of output node features.
-    activation : Function
-        activation function, default to be relu function.
-    bias : bool
-        Whether to add bias after affine transformation, default to be True.
-    normalize : bool
-        Whether to normalize the adjacency matrix or not, default to be True.
-    batch_norm : bool
-        Whetehr to use BatchNormalization or not, default to be False.
-    dropout : float
-        The probability for dropout, default to 0.0.
-    W_init : initialize function for weight
-        Default to be He normal distribution.
-    b_init : initialize function for bias
-        Default to be normal distribution.
-
-    Returns
-    -------
-    init_fun : Function
-        Initializes the parameters of the layer.
-    apply_fun : Function
-        Defines the forward computation function.
+class GCNLayer(hk.Module):
+    """Single GCN layer from `Semi-Supervised Classification with Graph Convolutional Networks`
+        ref : <https://arxiv.org/abs/1609.02907>
     """
 
-    _, drop_fun = Dropout(dropout)
-    batch_norm_init, batch_norm_fun = BatchNorm()
-
-    def init_fun(rng, input_shape):
-        """Initialize parameters.
+    def __init__(self, in_feats: int, out_feats: int, activation=None, bias: bool = True,
+                 normalize: bool = True, batch_norm: bool = False, dropout: float = 0.0,
+                 w_init: Optional[hk.initializers.Initializer] = None,
+                 b_init: Optional[hk.initializers.Initializer] = None, name: Optional[str] = None):
+        """Initializes the module.
 
         Parameters
         ----------
-        rng : PRNGKey
-            rng is a value for generating random values.
-        input_shape : (batch_size, N, M1)
-            The shape of input (input node features).
-            N is the total number of nodes in the batch of graphs.
-            M1 is the input node feature size.
-
-        Returns
-        -------
-        output_shape : (batch_size, N, M2)
-            The shape of output (new node features).
-            M2 is the new node feature size and equal to out_dim.
-        params: Tuple (W, b, batch_norm_param)
-            W is a weight and b is a bias.
-            W : ndarray of shape (N, M2) or None
-            b : ndarray of shape (M2,)
-            batch_norm_param : Tuple (beta, gamma) or None
+        in_feats : int
+            Number of input node features.
+        out_feats : int
+            Number of output node features.
+        activation : Function
+            activation function, default to be relu function.
+        bias : bool
+            Whether to add bias after affine transformation, default to be True.
+        normalize : bool
+            Whether to normalize the adjacency matrix or not, default to be True.
+        batch_norm : bool
+            Whetehr to use BatchNormalization or not, default to be False.
+        dropout : float
+            The probability for dropout, default to 0.0.
+        W_init : initialize function for weight
+            Default to be He truncated normal distribution.
+        b_init : initialize function for bias
+            Default to be truncated normal distribution.
         """
-        output_shape = input_shape[:-1] + (out_dim,)
-        k1, k2, k3 = random.split(rng, 3)
-        W = W_init(k1, (input_shape[-1], out_dim))
-        b = b_init(k2, (out_dim,)) if bias else None
-        batch_norm_param = None
-        if batch_norm:
-            output_shape, batch_norm_param = batch_norm_init(k3, output_shape)
-        return output_shape, (W, b, batch_norm_param)
+        super(GCNLayer, self).__init__(name=name)
+        self.in_feats = in_feats
+        self.out_feats = out_feats
+        self.activation = activation or jax.nn.relu
+        self.bias = bias
+        self.normalize = normalize
+        self.batch_norm = batch_norm
+        self.dropout = dropout
+        self.w_init = w_init or hk.initializers.TruncatedNormal(np.sqrt(2. / in_feats))
+        self.b_init = b_init or hk.initializers.TruncatedNormal()
+        self.w = hk.get_parameter("w", shape=[in_feats, out_feats], init=self.w_init)
+        self.b = hk.get_parameter("b", shape=[out_feats], init=self.b_init)
 
-    def apply_fun(params, node_feats, adj, rng, is_train):
-        """Update node representations.
+    def __call__(self, node_feats: jnp.ndarray, adj: jnp.ndarray, is_training: bool) -> jnp.ndarray:
+        """Update node features.
 
         Parameters
         ----------
-        node_feats : ndarray of shape (batch_size, N, M1)
-            Batched input node features.
+        node_feats : ndarray of shape (batch_size, N, in_feats)
+            Batch input node features.
             N is the total number of nodes in the batch of graphs.
-            M1 is the input node feature size.
         adj : ndarray of shape (batch_size, N, N)
-            Batched adjacency matrix.
-        rng : PRNGKey
-            rng is a value for generating random values
-        is_train : bool
+            Batch adjacency matrix.
+        is_training : bool
             Whether the model is training or not.
 
         Returns
         -------
-        new_node_feats : ndarray of shape (batch_size, N, M2)
-            Batched new node features.
-            M2 is the new node feature size and equal to out_dim.
+        new_node_feats : ndarray of shape (batch_size, N, out_feats)
+            Batch new node features.
         """
-        W, b, batch_norm_param = params
+        self.dropout = self.dropout if is_training else 0.0
 
-        if normalize:
-            # A' = A + I, where I is the identity matrix
-            # D': diagonal node degree matrix of A'
-            # H' = D'^(-1/2) × A' × D'^(-1/2) × H × W
-            def node_update_func(node_feats, adj):
-                adj = adj + jnp.eye(len(adj))
-                deg = jnp.sum(adj, axis=1)
-                deg_mat = jnp.diag(jnp.where(deg > 0, deg**(-0.5), 0))
-                normalized_adj = jnp.dot(deg_mat, jnp.dot(adj, deg_mat))
-                return jnp.dot(normalized_adj, jnp.dot(node_feats, W))
-        else:
-            # H' = A × H × W
-            def node_update_func(node_feats, adj):
-                return jnp.dot(adj, jnp.dot(node_feats, W))
+        # for batch data
+        new_node_feats = jax.vmap(self.__update_func)(node_feats, adj)
+        if self.bias:
+            new_node_feats += self.b
+        new_node_feats = self.activation(new_node_feats)
 
-        # batched operation for updating node features
-        new_node_feats = vmap(node_update_func)(node_feats, adj)
+        if self.dropout != 0.0:
+            new_node_feats = hk.dropout(hk.next_rng_key(), self.dropout, new_node_feats)
+        if self.batch_norm:
+            new_node_feats = hk.BatchNorm()(new_node_feats)
 
-        if bias:
-            new_node_feats += b
-        new_node_feats = activation(new_node_feats)
-        if dropout != 0.0:
-            rng, key = random.split(rng)
-            new_node_feats = drop_fun(None, new_node_feats, is_train, rng=key)
-        if batch_norm:
-            new_node_feats = batch_norm_fun(batch_norm_param, new_node_feats)
         return new_node_feats
 
-    return init_fun, apply_fun
+    def __update_func(self, node_feats: jnp.ndarray, adj: jnp.ndarray) -> jnp.ndarray:
+        """Function of updating node features with no batch data.
+
+        The case adjacency matrix is normalized,
+        .. math::
+            H^{(l+1)} = \sigma(\tilde{D}^{-\frac{1}{2}}\tilde{A}\tilde{D}^{-\frac{1}{2}}H^{(l)}W^{(l)})
+
+        The case adjacency matrix is not normalized,
+        .. math::
+            H^{(l+1)} = \sigma(AH^{(l)}W^{(l)})
+
+        Parameters
+        ----------
+        node_feats : ndarray of shape (N, in_feats)
+            input node features.
+            N is the total number of nodes in the batch of graphs.
+        adj : ndarray of shape (N, N)
+            adjacency matrix.
+
+        Returns
+        -------
+        new_node_feats : ndarray of shape (N, out_feats)
+            new node features
+        """
+        if self.normalize:
+            adj = adj + jnp.eye(len(adj))
+            deg = jnp.sum(adj, axis=1)
+            deg_mat = jnp.diag(jnp.where(deg > 0, deg**(-0.5), 0))
+            normalized_adj = jnp.dot(deg_mat, jnp.dot(adj, deg_mat))
+            return jnp.dot(normalized_adj, jnp.dot(node_feats, self.w))
+        else:
+            return jnp.dot(adj, jnp.dot(node_feats, self.w))

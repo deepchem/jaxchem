@@ -82,5 +82,5 @@ class TestEarlyStopping(unittest.TestCase):
         early_stop.update(score=init_score, params=None)
         for i in range(5):
             assert early_stop.is_train_stop is False
-            early_stop.update(score=i+1, params=None)
+            early_stop.update(score=i + 1, params=None)
         assert early_stop.is_train_stop

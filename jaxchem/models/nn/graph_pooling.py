@@ -1,8 +1,8 @@
 import jax.numpy as jnp
 
 
-def pooling(method='mean'):
-    """Pooling function for pad pattern.
+def graph_pooling(method='mean'):
+    """Pooling function for pad pattern graph data.
 
     method : str
         pooling method name
