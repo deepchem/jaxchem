@@ -23,7 +23,7 @@ class GCNLayer(hk.Module):
             Number of input node features.
         out_feats : int
             Number of output node features.
-        activation : Function
+        activation : Function or None
             activation function, default to be relu function.
         bias : bool
             Whether to add bias after affine transformation, default to be True.

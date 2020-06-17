@@ -4,10 +4,14 @@ https://github.com/Bjarten/early-stopping-pytorch/blob/master/pytorchtools.py
 """
 
 
+from typing import Any
+
+
 class EarlyStopping:
     """Early stops the training if score doesn't improve after a given patience."""
 
-    def __init__(self, patience=10, delta=0, is_greater_better=True):
+    def __init__(self, patience: int = 10, delta: int = 0, 
+                 is_greater_better: bool = True):
         """
         Parameters
         ----------
@@ -27,7 +31,7 @@ class EarlyStopping:
         self.is_train_stop = False
         self.__tmp_best_score = None
 
-    def update(self, score, params):
+    def update(self, score: float, params: Any):
         """Update early stopping counter.
 
         Parameters
