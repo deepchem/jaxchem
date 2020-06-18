@@ -29,9 +29,9 @@ class GCN(hk.Module):
             ``activation[i]`` is the activation function of the i-th GCN layer.
             ``len(activation)`` equals the number of GCN layers. By default,
             the activation each layer is relu function.
-        batchnorm : list[bool] or None
-            ``batchnorm[i]`` decides if batch normalization is to be applied on the output of
-            the i-th GCN layer. ``len(batchnorm)`` equals the number of GCN layers. By default,
+        batch_norm : list[bool] or None
+            ``batch_norm[i]`` decides if batch normalization is to be applied on the output of
+            the i-th GCN layer. ``len(batch_norm)`` equals the number of GCN layers. By default,
             batch normalization is not applied for all GCN layers.
         dropout : list[float] or None
             ``dropout[i]`` decides the dropout probability on the output of the i-th GCN layer.
