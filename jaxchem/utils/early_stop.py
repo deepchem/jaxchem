@@ -4,8 +4,6 @@ https://github.com/Bjarten/early-stopping-pytorch/blob/master/pytorchtools.py
 """
 from typing import Any, Optional
 
-import haiku as hk
-
 
 class EarlyStopping:
     """Early stops the training if score doesn't improve after a given patience."""
