@@ -2,7 +2,7 @@ import jax.numpy as jnp
 from jax import nn
 
 
-def clipped_sigmoid(x):
+def clipped_sigmoid(x: jnp.ndarray) -> jnp.ndarray:
     """Customize sigmoid function to avoid an overflow.
 
     Parameters

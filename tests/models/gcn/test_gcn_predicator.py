@@ -1,39 +1,41 @@
 import unittest
 
+import haiku as hk
 import jax.random as jrandom
 from jaxchem.models import GCNPredicator
 
 
 # params
-HIDDEN_FEATS = [64, 32, 16]
-POOLING_METHOD = 'mean'
-PREDICATOR_HIDDEN_FEATS = 16
-N_OUT = 1
-BATCH_SIZE = 32
-MAX_NODE_SIZE = 30
-NODE_FEATURE_DIM = 64
+in_feats = 64
+hidden_feats = [64, 32, 16]
+pooling_method = 'mean'
+predicator_hidden_feats = 16
+n_out = 1
+batch_size = 32
+max_node_size = 30
 
 
 class TestGCNPredicator(unittest.TestCase):
     """Test GCNPredicator"""
 
     def setup_method(self, method):
-        self.key = jrandom.PRNGKey(1234)
+        self.key = hk.PRNGSequence(1234)
         self.input_data = self.__setup_data()
-        self.models_fun = GCNPredicator(hidden_feats=HIDDEN_FEATS, pooling_method=POOLING_METHOD,
-                                        predicator_hidden_feats=PREDICATOR_HIDDEN_FEATS,
-                                        n_out=N_OUT)
 
     def __setup_data(self):
-        self.key, k1, k2, k3 = jrandom.split(self.key, 4)
-        batched_node_feats = jrandom.normal(k1, (BATCH_SIZE, MAX_NODE_SIZE, NODE_FEATURE_DIM))
-        batched_adj = jrandom.normal(k2, (BATCH_SIZE, MAX_NODE_SIZE, MAX_NODE_SIZE))
-        return (batched_node_feats, batched_adj, k3, True)
+        batched_node_feats = jrandom.normal(next(self.key), (batch_size, max_node_size, in_feats))
+        batched_adj = jrandom.normal(next(self.key), (batch_size, max_node_size, max_node_size))
+        return (batched_node_feats, batched_adj, True)
+
+    def __forward(self, node_feats, adj, is_training):
+        model = GCNPredicator(in_feats=in_feats, hidden_feats=hidden_feats,
+                              pooling_method=pooling_method,
+                              predicator_hidden_feats=predicator_hidden_feats, n_out=n_out)
+        return model(node_feats, adj, is_training)
 
     def test_forward_shape(self):
-        """Test output shape of GCNPredicator"""
-        init_fun, predict_fun = self.models_fun
-        out_shape, params = init_fun(self.key, self.input_data[0].shape)
-        preds = predict_fun(params, *self.input_data)
-        assert preds.shape == out_shape
-        assert preds.shape == (BATCH_SIZE, N_OUT)
+        """Test output shape of GCNLayer"""
+        forward = hk.transform(self.__forward, apply_rng=True)
+        params = forward.init(next(self.key), *self.input_data)
+        preds = forward.apply(params, next(self.key), *self.input_data)
+        assert preds.shape == (batch_size, n_out)

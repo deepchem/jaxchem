@@ -1,4 +1,4 @@
-name: Lint and Test for jaxchem
+name: main
 on:
   push: # ci work when pushing master branch
     branches:
@@ -11,7 +11,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        os: [macos-latest, ubuntu-latest]
         python-version: [3.6, 3.7]
     steps:
     - uses: actions/checkout@v2
@@ -30,6 +30,9 @@ jobs:
     - name: Lint with flake8
       run: |
         flake8 . --count --show-source --statistics
+    - name: Type check
+      run: |
+        mypy --ignore-missing-imports jaxchem examples
     - name: Test with pytest
       run: |
         pytest -v --cov=jaxchem --cov-report html:cov_html_${{ matrix.os }}_${{ matrix.python-version }}
