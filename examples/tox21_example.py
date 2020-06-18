@@ -20,8 +20,8 @@ from jaxchem.utils import EarlyStopping
 
 # type definition
 PRNGKey = jnp.ndarray
-Batch = Tuple[np.ndarray, np.ndarray, bool, np.ndarray]
-OptState = Any
+Batch = Tuple[Tuple[np.ndarray, np.ndarray], np.ndarray]
+State, OptState = Any, Any
 
 # task
 task_names = ['NR-AR', 'NR-AR-LBD', 'NR-AhR', 'NR-Aromatase', 'NR-ER', 'NR-ER-LBD',
@@ -45,14 +45,19 @@ def seed_everything(seed: int = 42):
     np.random.seed(seed)
 
 
-def collate_fn(original_batch: Any, task_index: int, is_train: bool) -> Batch:
-    """Make a correct batch as GCN model inputs"""
+def collate_fn(original_batch: Any, task_index: int) -> Batch:
+    """Make a correct batch as GCN model inputs."""
     # convert a batch returned by iterbatches to a correct batch as model inputs
     inputs, targets, _, _ = original_batch
     node_feats = np.array([inputs[i][1] for i in range(len(inputs))])
     adj = np.array([inputs[i][0] for i in range(len(inputs))])
     targets = targets[:, task_index]
-    return (node_feats, adj, is_train, targets)
+    return ((node_feats, adj), targets)
+
+
+def binary_cross_entropy(logits: jnp.ndarray, targets: jnp.ndarray) -> jnp.ndarray:
+    """Compute binary cross entropy loss."""
+    return -jnp.mean(targets * jnp.log(logits) + (1.0 - targets) * jnp.log(1.0 - logits))
 
 
 def main():
@@ -68,12 +73,12 @@ def main():
     rng_seq = hk.PRNGSequence(args.seed)
     # model params
     in_feats = train_dataset.X[0][1].shape[1]
-    hidden_feats = [64, 64, 32]
-    activation, batch_norm, dropout = None, None, None  # use default
+    hidden_feats = [64, 64, 64]
+    activation, batch_norm, dropout = None, None, None # use default
     predicator_hidden_feats = 32
     pooling_method = 'mean'
-    predicator_dropout = None  # use default
-    n_out = 1  # binary classification
+    predicator_dropout = 0.2 # use default
+    n_out = 1 # binary classification
     # training params
     lr = args.lr
     num_epochs = args.epochs
@@ -83,6 +88,7 @@ def main():
 
     # setup model
     def forward(node_feats: jnp.ndarray, adj: jnp.ndarray, is_training: bool) -> jnp.ndarray:
+        """Forward application of the GCN."""
         model = GCNPredicator(in_feats=in_feats, hidden_feats=hidden_feats, activation=activation,
                               batch_norm=batch_norm, dropout=dropout, pooling_method=pooling_method,
                               predicator_hidden_feats=predicator_hidden_feats,
@@ -91,27 +97,35 @@ def main():
         logits = clipped_sigmoid(preds)
         return logits
 
-    model = hk.transform(forward, apply_rng=True)
+    model = hk.transform_with_state(forward)
     optimizer = optix.adam(learning_rate=lr)
 
     # define training loss
-    @jax.jit
-    def loss(params: hk.Params, key: PRNGKey, batch: Batch) -> jnp.ndarray:
-        """Compute the loss (binary cross entropy) """
-        inputs, targets = batch[:-1], batch[-1]
-        logits = model.apply(params, key, *inputs)
-        loss = -jnp.mean(targets * jnp.log(logits) + (1 - targets) * jnp.log(1 - logits))
-        return loss
+    def train_loss(params: hk.Params, state: State, batch: Batch) -> Tuple[jnp.ndarray, State]:
+        """Compute the loss."""
+        inputs, targets = batch
+        logits, new_state = model.apply(params, state, next(rng_seq), *inputs, True)
+        loss = binary_cross_entropy(logits, targets)
+        return loss, new_state
 
     # define training update
     @jax.jit
-    def update(params: hk.Params, rng_key: PRNGKey,
-               opt_state: OptState, batch: Batch) -> Tuple[hk.Params, OptState]:
-        """Update the params"""
-        grads = jax.grad(loss)(params, rng_key, batch)
+    def update(params: hk.Params, state: State, opt_state: OptState,
+               batch: Batch) -> Tuple[hk.Params, State, OptState]:
+        """Update the params."""
+        (_, new_state), grads = jax.value_and_grad(train_loss, has_aux=True)(params, state, batch)
         updates, new_opt_state = optimizer.update(grads, opt_state)
         new_params = optix.apply_updates(params, updates)
-        return new_params, new_opt_state
+        return new_params, new_state, new_opt_state
+
+    # define evaluate metrics
+    @jax.jit
+    def evaluate(params: hk.Params, state: State, batch: Batch) -> jnp.ndarray:
+        """Compute evaluate metrics."""
+        inputs, targets = batch
+        logits, _ = model.apply(params, state, next(rng_seq), *inputs, False)
+        loss = binary_cross_entropy(logits, targets)
+        return logits, loss, targets
 
     print("Starting training...")
     task_index = tox21_tasks.index(task)
@@ -121,46 +135,45 @@ def main():
         np.zeros((batch_size, *train_dataset.X[0][0].shape)),
         True
     )
-    params = model.init(next(rng_seq), *batch_init_data)
+    params, state = model.init(next(rng_seq), *batch_init_data)
     opt_state = optimizer.init(params)
     for epoch in range(num_epochs):
         # train
         start_time = time.time()
         for original_batch in train_dataset.iterbatches(batch_size=batch_size):
-            batch = collate_fn(original_batch, task_index, True)
-            params, opt_state = update(params, next(rng_seq), opt_state, batch)
+            batch = collate_fn(original_batch, task_index)
+            params, state, opt_state = update(params, state, opt_state, batch)
         epoch_time = time.time() - start_time
 
         # valid
         y_score, y_true, valid_loss = [], [], []
         for original_batch in valid_dataset.iterbatches(batch_size=batch_size):
-            batch = collate_fn(original_batch, task_index, False)
-            y_score.extend(model.apply(params, next(rng_seq), *batch[:-1]))
-            y_true.extend(batch[-1])
-            valid_loss.append(loss(params, next(rng_seq), batch))
+            batch = collate_fn(original_batch, task_index)
+            logits, loss, targets = evaluate(params, state, batch)
+            y_score.extend(logits), valid_loss.append(loss), y_true.extend(targets)
         score = roc_auc_score(y_true, y_score)
 
         # log
         print(f"Iter {epoch}/{num_epochs} ({epoch_time:.4f} s) valid loss: {np.mean(valid_loss):.4f} \
             valid roc_auc score: {score:.4f}")
         # check early stopping
-        early_stop.update(score, params)
+        early_stop.update(score, (params, state))
         if early_stop.is_train_stop:
             print("Early stopping...")
             break
 
     # test
     y_score, y_true = [], []
-    best_params = early_stop.best_params
+    best_checkpoints = early_stop.best_checkpoints
     for original_batch in test_dataset.iterbatches(batch_size=batch_size):
-        batch = collate_fn(original_batch, task_index, False)
-        y_score.extend(model.apply(params, next(rng_seq), *batch[:-1]))
-        y_true.extend(batch[-1])
+        batch = collate_fn(original_batch, task_index)
+        logits, _, targets = evaluate(*best_checkpoints, batch)
+        y_score.extend(logits), y_true.extend(targets)
     score = roc_auc_score(y_true, y_score)
     print(f'Test roc_auc score: {score:.4f}')
-    # save best params
-    with open('./best_params.pkl', 'wb') as f:
-        pickle.dump(best_params, f)
+    # save best checkpoints
+    with open('./best_checkpoints.pkl', 'wb') as f:
+        pickle.dump(best_checkpoints, f)
 
 
 if __name__ == "__main__":

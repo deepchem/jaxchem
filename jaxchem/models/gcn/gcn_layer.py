@@ -114,7 +114,7 @@ class GCNLayer(hk.Module):
         if self.normalize:
             adj = adj + jnp.eye(len(adj))
             deg = jnp.sum(adj, axis=1)
-            deg_mat = jnp.diag(jnp.where(deg > 0, deg**(-0.5), 0))
+            deg_mat = jnp.diag(jnp.where(deg > 0., deg**(-0.5), 0.))
             normalized_adj = jnp.dot(deg_mat, jnp.dot(adj, deg_mat))
             return jnp.dot(normalized_adj, jnp.dot(node_feats, self.w))
         else:
