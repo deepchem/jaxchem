@@ -74,11 +74,11 @@ def main():
     # model params
     in_feats = train_dataset.X[0][1].shape[1]
     hidden_feats = [64, 64, 64]
-    activation, batch_norm, dropout = None, None, None # use default
+    activation, batch_norm, dropout = None, None, None  # use default
     predicator_hidden_feats = 32
     pooling_method = 'mean'
-    predicator_dropout = 0.2 # use default
-    n_out = 1 # binary classification
+    predicator_dropout = 0.2  # use default
+    n_out = 1  # binary classification
     # training params
     lr = args.lr
     num_epochs = args.epochs
