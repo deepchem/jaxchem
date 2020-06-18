@@ -3,14 +3,13 @@ import time
 import random
 import pickle
 import argparse
-import itertools
+from typing import Any, Tuple
 
-
+import jax
 import numpy as np
+import haiku as hk
 import jax.numpy as jnp
-import jax.random as jrandom
-from jax import grad, jit
-from jax.experimental import optimizers
+from jax.experimental import optix
 from sklearn.metrics import roc_auc_score
 
 
@@ -19,13 +18,19 @@ from jaxchem.models import GCNPredicator, clipped_sigmoid
 from jaxchem.utils import EarlyStopping
 
 
+# type definition
+PRNGKey = jnp.ndarray
+Batch = Tuple[np.ndarray, np.ndarray, bool, np.ndarray]
+OptState = Any
+
+# task
 task_names = ['NR-AR', 'NR-AR-LBD', 'NR-AhR', 'NR-Aromatase', 'NR-ER', 'NR-ER-LBD',
               'NR-PPAR-gamma', 'SR-ARE', 'SR-ATAD5', 'SR-HSE', 'SR-MMP', 'SR-p53']
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser('Tox21 example')
-    parser.add_argument('--seed', type=int, default=1234)
+    parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--task', type=str, choices=task_names, default='NR-AR')
     parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--epochs', type=int, default=50)
@@ -34,20 +39,20 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def seed_everything(seed):
+def seed_everything(seed: int = 42):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
     np.random.seed(seed)
 
 
-def collate_fn(original_batch, task_index, rng, is_train):
+def collate_fn(original_batch: Any, task_index: int, is_train: bool) -> Batch:
     """Make a correct batch as GCN model inputs"""
     # convert a batch returned by iterbatches to a correct batch as model inputs
     inputs, targets, _, _ = original_batch
     node_feats = np.array([inputs[i][1] for i in range(len(inputs))])
     adj = np.array([inputs[i][0] for i in range(len(inputs))])
     targets = targets[:, task_index]
-    return (node_feats, adj, rng, is_train, targets)
+    return (node_feats, adj, is_train, targets)
 
 
 def main():
@@ -60,10 +65,11 @@ def main():
     train_dataset, valid_dataset, test_dataset = tox21_datasets
 
     # define hyperparams
-    rng = jrandom.PRNGKey(args.seed)
+    rng_seq = hk.PRNGSequence(args.seed)
     # model params
+    in_feats = train_dataset.X[0][1].shape[1]
     hidden_feats = [64, 64, 64]
-    activation, batchnorm, dropout = None, None, None  # use default
+    activation, batch_norm, dropout = None, None, None  # use default
     predicator_hidden_feats = 32
     pooling_method = 'mean'
     predicator_dropout = None  # use default
@@ -76,65 +82,62 @@ def main():
     early_stop_patience = args.early_stop
 
     # setup model
-    init_fun, predict_fun = \
-        GCNPredicator(hidden_feats=hidden_feats, activation=activation, batchnorm=batchnorm,
-                      dropout=dropout, pooling_method=pooling_method,
-                      predicator_hidden_feats=predicator_hidden_feats,
-                      predicator_dropout=predicator_dropout, n_out=n_out)
-
-    # init params
-    rng, init_key = jrandom.split(rng)
-    sample_node_feat = train_dataset.X[0][1]
-    input_shape = sample_node_feat.shape
-    _, init_params = init_fun(init_key, input_shape)
-    opt_init, opt_update, get_params = optimizers.adam(step_size=lr)
-    opt_state = opt_init(init_params)
-
-    @jit
-    def predict(params, inputs):
-        """Predict the logits"""
-        preds = predict_fun(params, *inputs)
+    def forward(node_feats: jnp.ndarray, adj: jnp.ndarray, is_training: bool) -> jnp.ndarray:
+        model = GCNPredicator(in_feats=in_feats, hidden_feats=hidden_feats, activation=activation,
+                              batch_norm=batch_norm, dropout=dropout, pooling_method=pooling_method,
+                              predicator_hidden_feats=predicator_hidden_feats,
+                              predicator_dropout=predicator_dropout, n_out=n_out)
+        preds = model(node_feats, adj, is_training)
         logits = clipped_sigmoid(preds)
         return logits
 
+    model = hk.transform(forward, apply_rng=True)
+    optimizer = optix.adam(learning_rate=lr)
+
     # define training loss
-    @jit
-    def loss(params, batch):
+    @jax.jit
+    def loss(params: hk.Params, key: PRNGKey, batch: Batch) -> jnp.ndarray:
         """Compute the loss (binary cross entropy) """
         inputs, targets = batch[:-1], batch[-1]
-        logits = predict(params, inputs)
+        logits = model.apply(params, key, *inputs)
         loss = -jnp.mean(targets * jnp.log(logits) + (1 - targets) * jnp.log(1 - logits))
         return loss
 
     # define training update
-    @jit
-    def update(i, opt_state, batch):
+    @jax.jit
+    def update(params: hk.Params, rng_key: PRNGKey,
+               opt_state: OptState, batch: Batch) -> Tuple[hk.Params, OptState]:
         """Update the params"""
-        params = get_params(opt_state)
-        return opt_update(i, grad(loss)(params, batch), opt_state)
+        grads = jax.grad(loss)(params, rng_key, batch)
+        updates, new_opt_state = optimizer.update(grads, opt_state)
+        new_params = optix.apply_updates(params, updates)
+        return new_params, new_opt_state
 
     print("Starting training...")
     task_index = tox21_tasks.index(task)
-    itercount = itertools.count()
     early_stop = EarlyStopping(patience=early_stop_patience)
+    batch_init_data = (
+        np.zeros((batch_size, *train_dataset.X[0][1].shape)),
+        np.zeros((batch_size, *train_dataset.X[0][0].shape)),
+        True
+    )
+    params = model.init(next(rng_seq), *batch_init_data)
+    opt_state = optimizer.init(params)
     for epoch in range(num_epochs):
         # train
         start_time = time.time()
         for original_batch in train_dataset.iterbatches(batch_size=batch_size):
-            rng, key = jrandom.split(rng)
-            batch = collate_fn(original_batch, task_index, key, True)
-            opt_state = update(next(itercount), opt_state, batch)
+            batch = collate_fn(original_batch, task_index, True)
+            params, opt_state = update(params, next(rng_seq), opt_state, batch)
         epoch_time = time.time() - start_time
 
         # valid
-        params = get_params(opt_state)
         y_score, y_true, valid_loss = [], [], []
         for original_batch in valid_dataset.iterbatches(batch_size=batch_size):
-            rng, key = jrandom.split(rng)
-            batch = collate_fn(original_batch, task_index, key, False)
-            y_score.extend(predict(params, batch[:-1]))
+            batch = collate_fn(original_batch, task_index, False)
+            y_score.extend(model.apply(params, next(rng_seq), *batch[:-1]))
             y_true.extend(batch[-1])
-            valid_loss.append(loss(params, batch))
+            valid_loss.append(loss(params, next(rng_seq), batch))
         score = roc_auc_score(y_true, y_score)
 
         # log
@@ -150,9 +153,8 @@ def main():
     y_score, y_true = [], []
     best_params = early_stop.best_params
     for original_batch in test_dataset.iterbatches(batch_size=batch_size):
-        rng, key = jrandom.split(rng)
-        batch = collate_fn(original_batch, task_index, key, False)
-        y_score.extend(predict(best_params, batch[:-1]))
+        batch = collate_fn(original_batch, task_index, False)
+        y_score.extend(model.apply(params, next(rng_seq), *batch[:-1]))
         y_true.extend(batch[-1])
     score = roc_auc_score(y_true, y_score)
     print(f'Test roc_auc score: {score:.4f}')

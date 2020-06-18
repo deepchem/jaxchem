@@ -2,15 +2,15 @@
 We referred the below implementation
 https://github.com/Bjarten/early-stopping-pytorch/blob/master/pytorchtools.py
 """
+from typing import Optional
 
-
-from typing import Any
+import haiku as hk
 
 
 class EarlyStopping:
     """Early stops the training if score doesn't improve after a given patience."""
 
-    def __init__(self, patience: int = 10, delta: int = 0, 
+    def __init__(self, patience: int = 10, delta: int = 0,
                  is_greater_better: bool = True):
         """
         Parameters
@@ -26,20 +26,20 @@ class EarlyStopping:
         self.delta = delta
         self.is_greater_better = is_greater_better
         self.counter = 0
-        self.best_score = None
+        self.best_score: Optional[float] = None
         self.best_params = None
         self.is_train_stop = False
-        self.__tmp_best_score = None
+        self.__tmp_best_score = 0.0
 
-    def update(self, score: float, params: Any):
+    def update(self, score: float, params: Optional[hk.Params] = None):
         """Update early stopping counter.
 
         Parameters
         ----------
         score : float
             validation score per epoch
-        params : Any
-            all parameters of each epoch
+        params : hk.Params or None
+            all parameters of training model
         """
         tmp_score = score if self.is_greater_better else -score
         if self.best_score is None:

@@ -30,6 +30,9 @@ jobs:
     - name: Lint with flake8
       run: |
         flake8 . --count --show-source --statistics
+    - name: Type check
+        run: |
+          mypy --ignore-missing-imports jaxchem
     - name: Test with pytest
       run: |
         pytest -v --cov=jaxchem --cov-report html:cov_html_${{ matrix.os }}_${{ matrix.python-version }}

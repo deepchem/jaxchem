@@ -29,7 +29,7 @@ class TestGCNPredicator(unittest.TestCase):
 
     def __forward(self, node_feats, adj, is_training):
         model = GCNPredicator(in_feats=in_feats, hidden_feats=hidden_feats,
-                              pooling_method=pooling_method, 
+                              pooling_method=pooling_method,
                               predicator_hidden_feats=predicator_hidden_feats, n_out=n_out)
         return model(node_feats, adj, is_training)
 

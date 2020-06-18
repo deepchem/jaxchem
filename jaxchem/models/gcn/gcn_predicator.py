@@ -1,6 +1,5 @@
 from typing import List, Optional
 
-
 import haiku as hk
 import jax
 import jax.numpy as jnp
@@ -8,14 +7,15 @@ import jax.numpy as jnp
 
 from jaxchem.models.nn.graph_pooling import graph_pooling
 from jaxchem.models.gcn.gcn import GCN
+from jaxchem.typing import Activation, Pooling
 
 
 class GCNPredicator(hk.Module):
     """GCN Predicator is a wrapper function using GCN and MLP."""
 
-    def __init__(self, in_feats: int, hidden_feats: List[int], activation: Optional[List] = None,
+    def __init__(self, in_feats: int, hidden_feats: List[int], activation: Optional[List[Activation]] = None,
                  batch_norm: Optional[List[bool]] = None, dropout: Optional[List[float]] = None,
-                 pooling_method: str = 'mean', predicator_hidden_feats: int = 128,
+                 pooling_method: Pooling = 'mean', predicator_hidden_feats: int = 128,
                  predicator_dropout: float = 0.0, n_out: int = 1,
                  bias: bool = None, normalize: bool = True, name: Optional[str] = None):
         """Initializes the module.
@@ -26,7 +26,7 @@ class GCNPredicator(hk.Module):
             Number of input node features.
         hidden_feats : list[int]
             List of output node features.
-        activation : list[Function] or None
+        activation : list[Activation] or None
             ``activation[i]`` is the activation function of the i-th GCN layer.
             ``len(activation)`` equals the number of GCN layers. By default,
             the activation each layer is relu function.
@@ -78,12 +78,12 @@ class GCNPredicator(hk.Module):
         out : ndarray of shape (batch_size, n_out)
             The shape of output.
         """
-        self.predicator_dropout = self.predicator_dropout if is_training else 0.0
+        predicator_dropout = self.predicator_dropout if is_training is True else 0.0
         node_feats = self.gcn(node_feats, adj, is_training)
         # pooling
         graph_feat = self.pooling(node_feats)
-        if self.predicator_dropout != 0.0:
-            graph_feat = hk.dropout(hk.next_rng_key(), self.predicator_dropout, graph_feat)
+        if predicator_dropout != 0.0:
+            graph_feat = hk.dropout(hk.next_rng_key(), predicator_dropout, graph_feat)
         graph_feat = self.fc(graph_feat)
         graph_feat = self.activation(graph_feat)
         out = self.out(graph_feat)

@@ -1,12 +1,12 @@
 from typing import List, Optional
 
-
 import haiku as hk
 import jax
 import jax.numpy as jnp
 
 
 from jaxchem.models.gcn.gcn_layer import GCNLayer
+from jaxchem.typing import Activation
 
 
 class GCN(hk.Module):
@@ -14,7 +14,7 @@ class GCN(hk.Module):
         ref : <https://arxiv.org/abs/1609.02907>
     """
 
-    def __init__(self, in_feats: int, hidden_feats: List[int], activation: Optional[List] = None,
+    def __init__(self, in_feats: int, hidden_feats: List[int], activation: Optional[List[Activation]] = None,
                  batch_norm: Optional[List[bool]] = None, dropout: Optional[List[float]] = None,
                  bias: bool = None, normalize: bool = True, name: Optional[str] = None):
         """Initializes the module.
@@ -25,7 +25,7 @@ class GCN(hk.Module):
             Number of input node features.
         hidden_feats : list[int]
             List of output node features.
-        activation : list[Function] or None
+        activation : list[Activation] or None
             ``activation[i]`` is the activation function of the i-th GCN layer.
             ``len(activation)`` equals the number of GCN layers. By default,
             the activation each layer is relu function.
@@ -44,18 +44,18 @@ class GCN(hk.Module):
         """
         super(GCN, self).__init__(name=name)
         layer_num = len(hidden_feats)
-        in_feats = [in_feats] + hidden_feats[:-1]
+        input_feats = [in_feats] + hidden_feats[:-1]
         out_feats = hidden_feats
         activation = activation or [jax.nn.relu for _ in range(layer_num)]
         batch_norm = batch_norm or [False for _ in range(layer_num)]
         dropout = dropout or [0.0 for _ in range(layer_num)]
         self.layer_num = layer_num
         self.layers = [
-            GCNLayer(in_feats[i], out_feats[i], activation=activation[i],
+            GCNLayer(input_feats[i], out_feats[i], activation=activation[i],
                      batch_norm=batch_norm[i], dropout=dropout[i]) for i in range(layer_num)
         ]
 
-        lengths = [len(in_feats), len(out_feats), len(activation),
+        lengths = [len(input_feats), len(out_feats), len(activation),
                    len(batch_norm), len(dropout)]
         assert len(set(lengths)) == 1, \
             'Expect the lengths of hidden_feats, activation, ' \
