@@ -77,7 +77,7 @@ def main():
     activation, batch_norm, dropout = None, None, None  # use default
     predicator_hidden_feats = 32
     pooling_method = 'mean'
-    predicator_dropout = 0.2  # use default
+    predicator_dropout = None  # use default
     n_out = 1  # binary classification
     # training params
     lr = args.lr
