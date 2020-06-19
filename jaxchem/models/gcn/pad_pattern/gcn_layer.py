@@ -9,7 +9,7 @@ import jax.numpy as jnp
 from jaxchem.typing import Activation
 
 
-class GCNLayer(hk.Module):
+class PadGCNLayer(hk.Module):
     """Single GCN layer from `Semi-Supervised Classification with Graph Convolutional Networks`
         ref : <https://arxiv.org/abs/1609.02907>
     """
@@ -41,7 +41,7 @@ class GCNLayer(hk.Module):
         b_init : initialize function for bias
             Default to be truncated normal distribution.
         """
-        super(GCNLayer, self).__init__(name=name)
+        super(PadGCNLayer, self).__init__(name=name)
         self.in_feats = in_feats
         self.out_feats = out_feats
         self.activation = activation or jax.nn.relu

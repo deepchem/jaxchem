@@ -5,11 +5,11 @@ import jax
 import jax.numpy as jnp
 
 
-from jaxchem.models.gcn.gcn_layer import GCNLayer
+from jaxchem.models.gcn.pad_pattern.gcn_layer import PadGCNLayer
 from jaxchem.typing import Activation
 
 
-class GCN(hk.Module):
+class PadGCN(hk.Module):
     """GCN `Semi-Supervised Classification with Graph Convolutional Networks`
         ref : <https://arxiv.org/abs/1609.02907>
     """
@@ -42,7 +42,7 @@ class GCN(hk.Module):
         normalize : bool
             Whether to normalize the adjacency matrix or not, default to be True.
         """
-        super(GCN, self).__init__(name=name)
+        super(PadGCN, self).__init__(name=name)
         layer_num = len(hidden_feats)
         input_feats = [in_feats] + hidden_feats[:-1]
         out_feats = hidden_feats
@@ -51,8 +51,8 @@ class GCN(hk.Module):
         dropout = dropout or [0.0 for _ in range(layer_num)]
         self.layer_num = layer_num
         self.layers = [
-            GCNLayer(input_feats[i], out_feats[i], activation=activation[i],
-                     batch_norm=batch_norm[i], dropout=dropout[i]) for i in range(layer_num)
+            PadGCNLayer(input_feats[i], out_feats[i], activation=activation[i],
+                        batch_norm=batch_norm[i], dropout=dropout[i]) for i in range(layer_num)
         ]
 
         lengths = [len(input_feats), len(out_feats), len(activation),

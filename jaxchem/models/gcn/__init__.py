@@ -1,3 +1,1 @@
-from jaxchem.models.gcn.gcn_layer import GCNLayer  # noqa
-from jaxchem.models.gcn.gcn import GCN  # noqa
-from jaxchem.models.gcn.gcn_predicator import GCNPredicator  # noqa
+from jaxchem.models.gcn.pad_pattern import PadGCNLayer, PadGCN, PadGCNPredicator  # noqa

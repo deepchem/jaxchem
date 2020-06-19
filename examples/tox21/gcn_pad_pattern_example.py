@@ -14,7 +14,7 @@ from sklearn.metrics import roc_auc_score
 
 
 from deepchem.molnet import load_tox21
-from jaxchem.models import GCNPredicator, clipped_sigmoid
+from jaxchem.models import PadGCNPredicator as GCNPredicator, clipped_sigmoid
 from jaxchem.utils import EarlyStopping
 
 

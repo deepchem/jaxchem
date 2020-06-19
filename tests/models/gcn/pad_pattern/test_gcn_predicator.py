@@ -2,7 +2,7 @@ import unittest
 
 import haiku as hk
 import jax.random as jrandom
-from jaxchem.models import GCNPredicator
+from jaxchem.models import PadGCNPredicator
 
 
 # params
@@ -16,7 +16,7 @@ max_node_size = 30
 
 
 class TestGCNPredicator(unittest.TestCase):
-    """Test GCNPredicator"""
+    """Test PadGCNPredicator"""
 
     def setup_method(self, method):
         self.key = hk.PRNGSequence(1234)
@@ -28,14 +28,14 @@ class TestGCNPredicator(unittest.TestCase):
         return (batched_node_feats, batched_adj, True)
 
     def __forward(self, node_feats, adj, is_training):
-        model = GCNPredicator(in_feats=in_feats, hidden_feats=hidden_feats,
-                              pooling_method=pooling_method,
-                              predicator_hidden_feats=predicator_hidden_feats, n_out=n_out)
+        model = PadGCNPredicator(in_feats=in_feats, hidden_feats=hidden_feats,
+                                 pooling_method=pooling_method,
+                                 predicator_hidden_feats=predicator_hidden_feats, n_out=n_out)
         return model(node_feats, adj, is_training)
 
     def test_forward_shape(self):
-        """Test output shape of GCNLayer"""
-        forward = hk.transform(self.__forward, apply_rng=True)
-        params = forward.init(next(self.key), *self.input_data)
-        preds = forward.apply(params, next(self.key), *self.input_data)
+        """Test output shape of PadGCNPredicator"""
+        forward = hk.transform_with_state(self.__forward)
+        params, state = forward.init(next(self.key), *self.input_data)
+        preds, _ = forward.apply(params, state, next(self.key), *self.input_data)
         assert preds.shape == (batch_size, n_out)
