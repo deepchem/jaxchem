@@ -74,4 +74,4 @@ class TestGraphPooling(unittest.TestCase):
         "Test invalid argument."
         # pad_graph_pooling
         with pytest.raises(ValueError):
-            invalid_pad_graph_pooling = pad_graph_pooling('set2set')
+            invalid_pad_graph_pooling = pad_graph_pooling('set2set') # noqa
