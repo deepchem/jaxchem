@@ -35,7 +35,7 @@ class TestGCNPredicator(unittest.TestCase):
 
     def test_forward_shape(self):
         """Test output shape of PadGCNPredicator"""
-        forward = hk.transform(self.__forward, apply_rng=True)
-        params = forward.init(next(self.key), *self.input_data)
-        preds = forward.apply(params, next(self.key), *self.input_data)
+        forward = hk.transform_with_state(self.__forward)
+        params, state = forward.init(next(self.key), *self.input_data)
+        preds, _ = forward.apply(params, state, next(self.key), *self.input_data)
         assert preds.shape == (batch_size, n_out)

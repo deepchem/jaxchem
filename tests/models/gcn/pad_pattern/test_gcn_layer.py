@@ -28,9 +28,20 @@ class TestPadGCNLayer(unittest.TestCase):
         model = PadGCNLayer(in_feats=in_feats, out_feats=out_feats)
         return model(node_feats, adj, is_training)
 
+    def __forward_with_batch_norm(self, node_feats, adj, is_training):
+        model = PadGCNLayer(in_feats=in_feats, out_feats=out_feats, batch_norm=True)
+        return model(node_feats, adj, is_training)
+
     def test_forward_shape(self):
         """Test output shape of PadGCNLayer"""
-        forward = hk.transform(self.__forward, apply_rng=True)
-        params = forward.init(next(self.key), *self.input_data)
-        preds = forward.apply(params, next(self.key), *self.input_data)
+        forward = hk.transform_with_state(self.__forward)
+        params, state = forward.init(next(self.key), *self.input_data)
+        preds, _ = forward.apply(params, state, next(self.key), *self.input_data)
+        assert preds.shape == (batch_size, max_node_size, out_feats)
+
+    def test_forward_shape_with_batch_norm(self):
+        """Test output shape of PadGCNLayer with BatchNorm"""
+        forward = hk.transform_with_state(self.__forward_with_batch_norm)
+        params, state = forward.init(next(self.key), *self.input_data)
+        preds, _ = forward.apply(params, state, next(self.key), *self.input_data)
         assert preds.shape == (batch_size, max_node_size, out_feats)

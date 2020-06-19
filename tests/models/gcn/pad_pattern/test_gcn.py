@@ -30,7 +30,7 @@ class TestPadGCN(unittest.TestCase):
 
     def test_forward_shape(self):
         """Test output shape of PadGCN"""
-        forward = hk.transform(self.__forward, apply_rng=True)
-        params = forward.init(next(self.key), *self.input_data)
-        preds = forward.apply(params, next(self.key), *self.input_data)
+        forward = hk.transform_with_state(self.__forward)
+        params, state = forward.init(next(self.key), *self.input_data)
+        preds, _ = forward.apply(params, state, next(self.key), *self.input_data)
         assert preds.shape == (batch_size, max_node_size, hidden_feats[-1])
