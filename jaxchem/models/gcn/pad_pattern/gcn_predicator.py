@@ -5,12 +5,12 @@ import jax
 import jax.numpy as jnp
 
 
-from jaxchem.models.nn.graph_pooling import graph_pooling
-from jaxchem.models.gcn.gcn import GCN
+from jaxchem.models.nn.graph_pooling import pad_graph_pooling
+from jaxchem.models.gcn.pad_pattern.gcn import PadGCN
 from jaxchem.typing import Activation, Pooling
 
 
-class GCNPredicator(hk.Module):
+class PadGCNPredicator(hk.Module):
     """GCN Predicator is a wrapper function using GCN and MLP."""
 
     def __init__(self, in_feats: int, hidden_feats: List[int], activation: Optional[List[Activation]] = None,
@@ -51,10 +51,10 @@ class GCNPredicator(hk.Module):
         normalize : bool
             Whether to normalize the adjacency matrix or not, default to be True.
         """
-        super(GCNPredicator, self).__init__(name=name)
-        self.gcn = GCN(in_feats, hidden_feats, activation=activation, batch_norm=batch_norm,
-                       dropout=dropout, bias=bias, normalize=normalize)
-        self.pooling = graph_pooling(pooling_method)
+        super(PadGCNPredicator, self).__init__(name=name)
+        self.gcn = PadGCN(in_feats, hidden_feats, activation=activation, batch_norm=batch_norm,
+                          dropout=dropout, bias=bias, normalize=normalize)
+        self.pooling = pad_graph_pooling(pooling_method)
         self.fc = hk.Linear(hidden_feats[-1])
         self.predicator_dropout = 0.0 if predicator_dropout is None else predicator_dropout
         self.activation = jax.nn.relu

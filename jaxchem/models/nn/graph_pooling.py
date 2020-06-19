@@ -6,7 +6,7 @@ import jax.numpy as jnp
 from jaxchem.typing import Pooling
 
 
-def graph_pooling(method: Pooling = 'mean') -> Callable[[jnp.ndarray], jnp.ndarray]:
+def pad_graph_pooling(method: Pooling = 'mean') -> Callable[[jnp.ndarray], jnp.ndarray]:
     """Pooling function for pad pattern graph data.
 
     method : str
