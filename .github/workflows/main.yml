@@ -32,7 +32,7 @@ jobs:
         flake8 . --count --show-source --statistics
     - name: Type check
       run: |
-        mypy --ignore-missing-imports jaxchem examples
+        mypy --ignore-missing-imports jaxchem examples/*
     - name: Test with pytest
       run: |
         pytest -v --cov=jaxchem --cov-report html:cov_html_${{ matrix.os }}_${{ matrix.python-version }}
