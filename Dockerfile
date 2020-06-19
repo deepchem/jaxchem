@@ -2,7 +2,7 @@ FROM nvidia/cuda:10.1-cudnn7-devel
 
 # Install some utilities
 RUN apt-get update && \
-    apt-get install -y -q wget git libxrender1 libsm6 bzip2 && \
+    apt-get install -y -q wget git vim libxrender1 libsm6 bzip2 && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 # Install miniconda
