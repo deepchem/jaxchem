@@ -19,7 +19,6 @@ from jaxchem.utils import EarlyStopping
 
 
 # type definition
-PRNGKey = jnp.ndarray
 Batch = Tuple[Tuple[np.ndarray, np.ndarray], np.ndarray]
 State, OptState = Any, Any
 
