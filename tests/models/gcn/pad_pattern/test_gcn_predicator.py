@@ -1,6 +1,7 @@
 import unittest
 
 import haiku as hk
+import jax.numpy as jnp
 import jax.random as jrandom
 from jaxchem.models import PadGCNPredicator
 
@@ -24,7 +25,10 @@ class TestGCNPredicator(unittest.TestCase):
 
     def __setup_data(self):
         batched_node_feats = jrandom.normal(next(self.key), (batch_size, max_node_size, in_feats))
-        batched_adj = jrandom.normal(next(self.key), (batch_size, max_node_size, max_node_size))
+        batched_adj = jnp.where(
+            jrandom.normal(next(self.key), (batch_size, max_node_size, max_node_size)) > 0,
+            0, 1
+        )
         return (batched_node_feats, batched_adj, True)
 
     def __forward(self, node_feats, adj, is_training):
