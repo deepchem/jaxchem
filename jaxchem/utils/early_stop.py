@@ -35,9 +35,9 @@ class EarlyStopping:
         Parameters
         ----------
         score : float
-            validation score per epoch
+            validation score per epoch.
         checkpoints : Any
-            all parameters and states of training model
+            all parameters and states of training model.
         """
         tmp_score = score if self.is_greater_better else -score
         if self.best_score is None:

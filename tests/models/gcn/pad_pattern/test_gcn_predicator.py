@@ -16,7 +16,7 @@ batch_size = 32
 max_node_size = 30
 
 
-class TestGCNPredicator(unittest.TestCase):
+class TestPadGCNPredicator(unittest.TestCase):
     """Test PadGCNPredicator"""
 
     def setup_method(self, method):
