@@ -151,6 +151,8 @@ def main():
     for epoch in range(num_epochs):
         # train
         start_time = time.time()
+        # FIXME : This for loop should be rewrited by lax.scan or lax.fori_loop
+        # update operation is tii slow....
         for original_batch in train_dataset.iterbatches(batch_size=batch_size):
             batch, graph_idx = collate_fn(original_batch, task_index)
             params, state, opt_state = update(params, state, opt_state, batch, graph_idx)
