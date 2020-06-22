@@ -46,7 +46,7 @@ def seed_everything(seed: int = 42):
 
 
 def collate_fn(original_batch: Any, task_index: int) -> Batch:
-    """Make batch data as SparseGCN model inputs."""
+    """Make batch data for SparseGCN model inputs."""
     inputs, targets, _, idx = original_batch
     batch_size = len(inputs)
     node_feats = np.concatenate([inputs[i].atom_features for i in range(batch_size)], axis=0)

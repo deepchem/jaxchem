@@ -45,8 +45,7 @@ def seed_everything(seed: int = 42):
 
 
 def collate_fn(original_batch: Any, task_index: int) -> Batch:
-    """Make batch data as PadGCN model inputs."""
-    # convert a batch returned by iterbatches to a correct batch as model inputs
+    """Make batch data for PadGCN model inputs."""
     inputs, targets, _, _ = original_batch
     node_feats = np.array([inputs[i][1] for i in range(len(inputs))])
     adj = np.array([inputs[i][0] for i in range(len(inputs))])
