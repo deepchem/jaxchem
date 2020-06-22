@@ -76,7 +76,7 @@ class PadGCNPredicator(hk.Module):
         Returns
         -------
         out : ndarray of shape (batch_size, n_out)
-            Final predicator output.
+            Predicator output.
         """
         predicator_dropout = self.predicator_dropout if is_training is True else 0.0
         node_feats = self.gcn(node_feats, adj, is_training)
