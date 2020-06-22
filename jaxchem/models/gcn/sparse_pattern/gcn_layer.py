@@ -83,6 +83,7 @@ class SparseGCNLayer(hk.Module):
         if self.normalize:
             src_idx, dest_idx = adj[0], adj[1]
             degree = index_add(jnp.zeros(len(new_node_feats)), src_idx, 1).reshape(-1, 1)
+            degree = jnp.where(degree == 0., 1., degree)
             new_node_feats = new_node_feats / jnp.sqrt(degree)
             new_node_feats = index_add(new_node_feats, [dest_idx], new_node_feats[src_idx])
             new_node_feats = new_node_feats / jnp.sqrt(degree)
@@ -92,6 +93,7 @@ class SparseGCNLayer(hk.Module):
 
         if self.bias:
             new_node_feats += self.b
+
         new_node_feats = self.activation(new_node_feats)
 
         if dropout != 0.0:

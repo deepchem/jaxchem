@@ -37,10 +37,6 @@ class SparseGCN(hk.Module):
             ``dropout[i]`` decides the dropout probability on the output of the i-th GCN layer.
             ``len(dropout)`` equals the number of GCN layers. By default, dropout is not
             performed for all layers.
-        bias : bool
-            Whether to add bias after affine transformation, default to be True.
-        normalize : bool
-            Whether to normalize the adjacency matrix or not, default to be True.
         """
         super(SparseGCN, self).__init__(name=name)
         layer_num = len(hidden_feats)

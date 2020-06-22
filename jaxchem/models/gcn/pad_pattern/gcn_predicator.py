@@ -46,14 +46,10 @@ class PadGCNPredicator(hk.Module):
             The probability for dropout in the predicator, default to 0.0.
         n_out : int
             Number of the output size, default to 1.
-        bias : bool
-            Whether to add bias after affine transformation, default to be True.
-        normalize : bool
-            Whether to normalize the adjacency matrix or not, default to be True.
         """
         super(PadGCNPredicator, self).__init__(name=name)
-        self.gcn = PadGCN(in_feats, hidden_feats, activation=activation, batch_norm=batch_norm,
-                          dropout=dropout, bias=bias, normalize=normalize)
+        self.gcn = PadGCN(in_feats, hidden_feats, activation=activation,
+                          batch_norm=batch_norm, dropout=dropout)
         self.pooling = pad_graph_pooling(pooling_method)
         self.fc = hk.Linear(hidden_feats[-1])
         self.predicator_dropout = 0.0 if predicator_dropout is None else predicator_dropout
