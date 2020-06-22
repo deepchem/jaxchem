@@ -25,7 +25,7 @@ RUN conda update -n base conda && \
     rm -rf ~/.cache/pip && \
     rm -rf .git
 
-# install jax and haiku
+# install jaxchem dependencies
 RUN . /miniconda/etc/profile.d/conda.sh && \
     conda activate deepchem && \
     PYTHON_VERSION=cp36 && \
@@ -34,7 +34,7 @@ RUN . /miniconda/etc/profile.d/conda.sh && \
     BASE_URL='https://storage.googleapis.com/jax-releases' && \
     pip install --upgrade $BASE_URL/$CUDA_VERSION/jaxlib-0.1.47-$PYTHON_VERSION-none-$PLATFORM.whl && \
     pip install --upgrade jax && \
-    pip install git+https://github.com/deepmind/dm-haiku && \
+    pip install git+https://github.com/deepmind/dm-haiku typing-extensions && \
     rm -rf ~/.cache/pip
 
 RUN echo "conda activate deepchem" >> ~/.bashrc
