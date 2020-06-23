@@ -5,12 +5,12 @@ import jax
 import jax.numpy as jnp
 
 
-from jaxchem.models.nn.graph_pooling import pad_graph_pooling
-from jaxchem.models.gcn.pad_pattern.gcn import PadGCN
+from jaxchem.models.nn.graph_pooling import sparse_graph_pooling
+from jaxchem.models.gcn.sparse_pattern.gcn import SparseGCN
 from jaxchem.typing import Activation, Pooling
 
 
-class PadGCNPredicator(hk.Module):
+class SparseGCNPredicator(hk.Module):
     """GCN Predicator is a wrapper function using GCN and MLP."""
 
     def __init__(self, in_feats: int, hidden_feats: List[int], activation: Optional[List[Activation]] = None,
@@ -47,25 +47,30 @@ class PadGCNPredicator(hk.Module):
         n_out : int
             Number of the output size, default to 1.
         """
-        super(PadGCNPredicator, self).__init__(name=name)
-        self.gcn = PadGCN(in_feats, hidden_feats, activation=activation,
-                          batch_norm=batch_norm, dropout=dropout)
-        self.pooling = pad_graph_pooling(pooling_method)
+        super(SparseGCNPredicator, self).__init__(name=name)
+        self.gcn = SparseGCN(in_feats, hidden_feats, activation=activation,
+                             batch_norm=batch_norm, dropout=dropout)
+        self.pooling = sparse_graph_pooling(pooling_method)
         self.fc = hk.Linear(hidden_feats[-1])
         self.predicator_dropout = 0.0 if predicator_dropout is None else predicator_dropout
         self.activation = jax.nn.relu
         self.out = hk.Linear(n_out)
 
-    def __call__(self, node_feats: jnp.ndarray, adj: jnp.ndarray, is_training: bool) -> jnp.ndarray:
+    def __call__(self, node_feats: jnp.ndarray, adj: jnp.ndarray, graph_idx: jnp.array,
+                 is_training: bool) -> jnp.ndarray:
         """Predict logits or values
 
         Parameters
         ----------
-        node_feats : ndarray of shape (batch_size, N, in_feats)
+        node_feats : ndarray of shape (N, in_feats)
             Batch input node features.
-            N is the total number of nodes in the batch of graphs.
-        adj : ndarray of shape (batch_size, N, N)
-            Batch adjacency matrix.
+            N is the total number of nodes in the batch
+        adj : ndarray of shape (2, E)
+            Batch adjacency list.
+            E is the total number of edges in the batch
+        graph_idx : ndarray of shape (N,)
+            This idx indicate a graph number for node_feats in the batch.
+            When the two nodes shows the same graph idx, these belong to the same graph.
         is_training : bool
             Whether the model is training or not.
 
@@ -77,7 +82,7 @@ class PadGCNPredicator(hk.Module):
         predicator_dropout = self.predicator_dropout if is_training is True else 0.0
         node_feats = self.gcn(node_feats, adj, is_training)
         # pooling
-        graph_feat = self.pooling(node_feats)
+        graph_feat = self.pooling(node_feats, graph_idx)
         if predicator_dropout != 0.0:
             graph_feat = hk.dropout(hk.next_rng_key(), predicator_dropout, graph_feat)
         graph_feat = self.fc(graph_feat)

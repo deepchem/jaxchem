@@ -4,6 +4,7 @@ import random
 import pickle
 import argparse
 from typing import Any, Tuple
+from functools import partial
 
 import jax
 import numpy as np
@@ -14,7 +15,7 @@ from sklearn.metrics import roc_auc_score
 
 
 from deepchem.molnet import load_tox21
-from jaxchem.models import PadGCNPredicator as GCNPredicator, clipped_sigmoid
+from jaxchem.models import SparseGCNPredicator as GCNPredicator, clipped_sigmoid
 from jaxchem.utils import EarlyStopping
 
 
@@ -45,13 +46,23 @@ def seed_everything(seed: int = 42):
 
 
 def collate_fn(original_batch: Any, task_index: int) -> Batch:
-    """Make batch data as PadGCN model inputs."""
-    # convert a batch returned by iterbatches to a correct batch as model inputs
-    inputs, targets, _, _ = original_batch
-    node_feats = np.array([inputs[i][1] for i in range(len(inputs))])
-    adj = np.array([inputs[i][0] for i in range(len(inputs))])
+    """Make batch data as SparseGCN model inputs."""
+    inputs, targets, _, idx = original_batch
+    batch_size = len(inputs)
+    node_feats = np.concatenate([inputs[i].atom_features for i in range(batch_size)], axis=0)
+    src_idx, dest_idx, graph_idx = [], [], []
+    total_n_atom = 0
+    for i in range(batch_size):
+        adj_list = inputs[i].canon_adj_list
+        for j, edge in enumerate(adj_list):
+            src_idx.extend([j + total_n_atom] * len(edge))
+            dest_idx.extend(np.array(edge) + total_n_atom)
+        graph_idx.extend([i] * inputs[i].n_atoms)
+        total_n_atom += inputs[i].n_atoms
+    edge_list = np.array([src_idx, dest_idx], dtype=np.int32)
+    graph_idx = np.array(graph_idx, dtype=np.int32)
     targets = targets[:, task_index]
-    return ((node_feats, adj), targets)
+    return ((node_feats, edge_list), targets), graph_idx
 
 
 def binary_cross_entropy(logits: jnp.ndarray, targets: jnp.ndarray) -> jnp.ndarray:
@@ -65,13 +76,13 @@ def main():
     seed_everything(args.seed)
 
     # load tox21 dataset
-    tox21_tasks, tox21_datasets, _ = load_tox21(featurizer='AdjacencyConv', reload=True)
+    tox21_tasks, tox21_datasets, _ = load_tox21(featurizer='GraphConv', reload=True)
     train_dataset, valid_dataset, test_dataset = tox21_datasets
 
     # define hyperparams
     rng_seq = hk.PRNGSequence(args.seed)
     # model params
-    in_feats = train_dataset.X[0][1].shape[1]
+    in_feats = train_dataset.X[0].n_feat
     hidden_feats = [64, 64, 64]
     activation, batch_norm, dropout = None, None, None  # use default
     predicator_hidden_feats = 32
@@ -86,13 +97,14 @@ def main():
     early_stop_patience = args.early_stop
 
     # setup model
-    def forward(node_feats: jnp.ndarray, adj: jnp.ndarray, is_training: bool) -> jnp.ndarray:
+    def forward(node_feats: jnp.ndarray, adj: jnp.ndarray, graph_idx: jnp.ndarray,
+                is_training: bool) -> jnp.ndarray:
         """Forward application of the GCN."""
         model = GCNPredicator(in_feats=in_feats, hidden_feats=hidden_feats, activation=activation,
                               batch_norm=batch_norm, dropout=dropout, pooling_method=pooling_method,
                               predicator_hidden_feats=predicator_hidden_feats,
                               predicator_dropout=predicator_dropout, n_out=n_out)
-        preds = model(node_feats, adj, is_training)
+        preds = model(node_feats, adj, graph_idx, is_training)
         logits = clipped_sigmoid(preds)
         return logits
 
@@ -100,55 +112,57 @@ def main():
     optimizer = optix.adam(learning_rate=lr)
 
     # define training loss
-    def train_loss(params: hk.Params, state: State, batch: Batch) -> Tuple[jnp.ndarray, State]:
+    def train_loss(params: hk.Params, state: State, batch: Batch,
+                   graph_idx: jnp.ndarray) -> Tuple[jnp.ndarray, State]:
         """Compute the loss."""
         inputs, targets = batch
-        logits, new_state = model.apply(params, state, next(rng_seq), *inputs, True)
+        logits, new_state = model.apply(params, state, next(rng_seq), *inputs, graph_idx, True)
         loss = binary_cross_entropy(logits, targets)
         return loss, new_state
 
     # define training update
-    @jax.jit
+    @partial(jax.jit, static_argnums=(4,))
     def update(params: hk.Params, state: State, opt_state: OptState,
-               batch: Batch) -> Tuple[hk.Params, State, OptState]:
+               batch: Batch, graph_idx: jnp.ndarray) -> Tuple[hk.Params, State, OptState]:
         """Update the params."""
-        (_, new_state), grads = jax.value_and_grad(train_loss, has_aux=True)(params, state, batch)
+        (_, new_state), grads = jax.value_and_grad(train_loss, has_aux=True)(params, state, batch, graph_idx)
         updates, new_opt_state = optimizer.update(grads, opt_state)
         new_params = optix.apply_updates(params, updates)
         return new_params, new_state, new_opt_state
 
     # define evaluate metrics
-    @jax.jit
-    def evaluate(params: hk.Params, state: State, batch: Batch) -> jnp.ndarray:
+    @partial(jax.jit, static_argnums=(3,))
+    def evaluate(params: hk.Params, state: State, batch: Batch,
+                 graph_idx: jnp.ndarray) -> jnp.ndarray:
         """Compute evaluate metrics."""
         inputs, targets = batch
-        logits, _ = model.apply(params, state, next(rng_seq), *inputs, False)
+        logits, _ = model.apply(params, state, next(rng_seq), *inputs, graph_idx, False)
         loss = binary_cross_entropy(logits, targets)
         return logits, loss, targets
 
     print("Starting training...")
     task_index = tox21_tasks.index(task)
     early_stop = EarlyStopping(patience=early_stop_patience)
-    batch_init_data = (
-        np.zeros((batch_size, *train_dataset.X[0][1].shape)),
-        np.zeros((batch_size, *train_dataset.X[0][0].shape)),
-        True
+    init_batch, init_graph_idx = collate_fn(
+        next(train_dataset.iterbatches(batch_size=batch_size)), task_index
     )
-    params, state = model.init(next(rng_seq), *batch_init_data)
+    params, state = model.init(next(rng_seq), *init_batch[0], init_graph_idx, True)
     opt_state = optimizer.init(params)
     for epoch in range(num_epochs):
         # train
         start_time = time.time()
+        # FIXME : This for loop should be rewrited by lax.scan or lax.fori_loop
+        # update operation is tii slow....
         for original_batch in train_dataset.iterbatches(batch_size=batch_size):
-            batch = collate_fn(original_batch, task_index)
-            params, state, opt_state = update(params, state, opt_state, batch)
+            batch, graph_idx = collate_fn(original_batch, task_index)
+            params, state, opt_state = update(params, state, opt_state, batch, graph_idx)
         epoch_time = time.time() - start_time
 
         # valid
         y_score, y_true, valid_loss = [], [], []
         for original_batch in valid_dataset.iterbatches(batch_size=batch_size):
-            batch = collate_fn(original_batch, task_index)
-            logits, loss, targets = evaluate(params, state, batch)
+            batch, graph_idx = collate_fn(original_batch, task_index)
+            logits, loss, targets = evaluate(params, state, batch, graph_idx)
             y_score.extend(logits), valid_loss.append(loss), y_true.extend(targets)
         score = roc_auc_score(y_true, y_score)
 
@@ -165,8 +179,8 @@ def main():
     y_score, y_true = [], []
     best_checkpoints = early_stop.best_checkpoints
     for original_batch in test_dataset.iterbatches(batch_size=batch_size):
-        batch = collate_fn(original_batch, task_index)
-        logits, _, targets = evaluate(*best_checkpoints, batch)
+        batch, graph_idx = collate_fn(original_batch, task_index)
+        logits, _, targets = evaluate(*best_checkpoints, batch, graph_idx)
         y_score.extend(logits), y_true.extend(targets)
     score = roc_auc_score(y_true, y_score)
     print(f'Test roc_auc score: {score:.4f}')

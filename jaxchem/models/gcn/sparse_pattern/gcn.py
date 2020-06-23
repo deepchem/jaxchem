@@ -5,11 +5,11 @@ import jax
 import jax.numpy as jnp
 
 
-from jaxchem.models.gcn.pad_pattern.gcn_layer import PadGCNLayer
+from jaxchem.models.gcn.sparse_pattern.gcn_layer import SparseGCNLayer
 from jaxchem.typing import Activation
 
 
-class PadGCN(hk.Module):
+class SparseGCN(hk.Module):
     """GCN `Semi-Supervised Classification with Graph Convolutional Networks`
         ref : <https://arxiv.org/abs/1609.02907>
     """
@@ -38,7 +38,7 @@ class PadGCN(hk.Module):
             ``len(dropout)`` equals the number of GCN layers. By default, dropout is not
             performed for all layers.
         """
-        super(PadGCN, self).__init__(name=name)
+        super(SparseGCN, self).__init__(name=name)
         layer_num = len(hidden_feats)
         input_feats = [in_feats] + hidden_feats[:-1]
         out_feats = hidden_feats
@@ -47,8 +47,8 @@ class PadGCN(hk.Module):
         dropout = dropout or [0.0 for _ in range(layer_num)]
         self.layer_num = layer_num
         self.layers = [
-            PadGCNLayer(input_feats[i], out_feats[i], activation=activation[i],
-                        batch_norm=batch_norm[i], dropout=dropout[i]) for i in range(layer_num)
+            SparseGCNLayer(input_feats[i], out_feats[i], activation=activation[i],
+                           batch_norm=batch_norm[i], dropout=dropout[i]) for i in range(layer_num)
         ]
 
         lengths = [len(input_feats), len(out_feats), len(activation),
@@ -63,17 +63,18 @@ class PadGCN(hk.Module):
 
         Parameters
         ----------
-        node_feats : ndarray of shape (batch_size, N, in_feats)
+        node_feats : ndarray of shape (N, in_feats)
             Batch input node features.
-            N is the total number of nodes in the batch of graphs.
-        adj : ndarray of shape (batch_size, N, N)
-            Batch adjacency matrix.
+            N is the total number of nodes in the batch.
+        adj : ndarray of shape (2, E)
+            Batch adjacency list.
+            E is the total number of edges in the batch.
         is_training : bool
             Whether the model is training or not.
 
         Returns
         -------
-        new_node_feats : ndarray of shape (batch_size, N, out_feats)
+        new_node_feats : ndarray of shape (N, out_feats)
             Batch new node features.
         """
         new_node_feats = node_feats
