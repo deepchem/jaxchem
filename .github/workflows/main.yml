@@ -35,4 +35,4 @@ jobs:
         mypy --ignore-missing-imports jaxchem examples/*
     - name: Test with pytest
       run: |
-        pytest -v --cov=jaxchem --cov-report html:cov_html_${{ matrix.os }}_${{ matrix.python-version }}
+        pytest -v --cov=jaxchem
