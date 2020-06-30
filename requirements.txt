@@ -1,4 +1,2 @@
-jax==0.1.68
-jaxlib==0.1.47
-dm-haiku
-typing-extensions
+dm-haiku==0.0.1
+typing-extensions>=3.7.4

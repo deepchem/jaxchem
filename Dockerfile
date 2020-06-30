@@ -33,8 +33,7 @@ RUN . /miniconda/etc/profile.d/conda.sh && \
     PLATFORM=linux_x86_64 && \
     BASE_URL='https://storage.googleapis.com/jax-releases' && \
     pip install --upgrade $BASE_URL/$CUDA_VERSION/jaxlib-0.1.47-$PYTHON_VERSION-none-$PLATFORM.whl && \
-    pip install --upgrade jax && \
-    pip install git+https://github.com/deepmind/dm-haiku typing-extensions && \
+    pip install --upgrade jax==0.1.69 dm-haiku==0.0.1 typing-extensions && \
     rm -rf ~/.cache/pip
 
 RUN echo "conda activate deepchem" >> ~/.bashrc
