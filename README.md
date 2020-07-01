@@ -3,7 +3,9 @@
 [![](https://github.com/deepchem/jaxchem/workflows/main/badge.svg)](https://github.com/deepchem/jaxchem/actions?query=workflow%3Amain)
 
 JAXChem is a JAX-based deep learning library for complex and versatile chemical modelings.  
-We welcome to contribute any chemical modelings for JAX.
+We welcome to contribute any chemical modelings with JAX.
+
+NOTE : This is a 2020 GSoC project with Open Chemistry. Please confirm the details from [here](https://summerofcode.withgoogle.com/projects/#4840359860895744).
 
 ## (WIP) Installation
 
@@ -27,6 +29,8 @@ $ pip install git+https://github.com/deepchem/jaxchem
 ```
 
 ### docker installation
+
+Please run the following commands.
 
 ```bash
 $ git clone https://github.com/deepchem/jaxchem.git
