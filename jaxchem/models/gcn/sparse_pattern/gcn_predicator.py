@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 
 
-from jaxchem.models.nn.graph_pooling import sparse_graph_pooling
+from jaxchem.models.readout.graph_pooling import sparse_graph_pooling
 from jaxchem.models.gcn.sparse_pattern.gcn import SparseGCN
 from jaxchem.typing import Activation, Pooling
 

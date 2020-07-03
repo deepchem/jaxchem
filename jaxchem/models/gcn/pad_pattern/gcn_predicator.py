@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 
 
-from jaxchem.models.nn.graph_pooling import pad_graph_pooling
+from jaxchem.models.readout.graph_pooling import pad_graph_pooling
 from jaxchem.models.gcn.pad_pattern.gcn import PadGCN
 from jaxchem.typing import Activation, Pooling
 

@@ -14,7 +14,8 @@ from sklearn.metrics import roc_auc_score
 
 
 from deepchem.molnet import load_tox21
-from jaxchem.models import PadGCNPredicator as GCNPredicator, clipped_sigmoid
+from jaxchem.models import PadGCNPredicator as GCNPredicator
+from jaxchem.loss import binary_cross_entropy_with_logits as bce_with_logits
 from jaxchem.utils import EarlyStopping
 
 
@@ -22,15 +23,14 @@ from jaxchem.utils import EarlyStopping
 Batch = Tuple[Tuple[np.ndarray, np.ndarray], np.ndarray]
 State, OptState = Any, Any
 
-# task
-task_names = ['NR-AR', 'NR-AR-LBD', 'NR-AhR', 'NR-Aromatase', 'NR-ER', 'NR-ER-LBD',
-              'NR-PPAR-gamma', 'SR-ARE', 'SR-ATAD5', 'SR-HSE', 'SR-MMP', 'SR-p53']
+# # task
+# task_names = ['NR-AR', 'NR-AR-LBD', 'NR-AhR', 'NR-Aromatase', 'NR-ER', 'NR-ER-LBD',
+#               'NR-PPAR-gamma', 'SR-ARE', 'SR-ATAD5', 'SR-HSE', 'SR-MMP', 'SR-p53']
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser('Tox21 example')
+    parser = argparse.ArgumentParser('Multitask Learning with Tox21.')
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--task', type=str, choices=task_names, default='NR-AR')
     parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--lr', type=float, default=0.001)
@@ -44,13 +44,12 @@ def seed_everything(seed: int = 42):
     np.random.seed(seed)
 
 
-def collate_fn(original_batch: Any, task_index: int) -> Batch:
+def collate_fn(original_batch: Any) -> Batch:
     """Make batch data as PadGCN model inputs."""
     # convert a batch returned by iterbatches to a correct batch as model inputs
     inputs, targets, _, _ = original_batch
     node_feats = np.array([inputs[i][1] for i in range(len(inputs))])
     adj = np.array([inputs[i][0] for i in range(len(inputs))])
-    targets = targets[:, task_index]
     return ((node_feats, adj), targets)
 
 
@@ -77,12 +76,12 @@ def main():
     predicator_hidden_feats = 32
     pooling_method = 'mean'
     predicator_dropout = None  # use default
-    n_out = 1  # binary classification
+    n_out = len(tox21_tasks)
     # training params
     lr = args.lr
     num_epochs = args.epochs
     batch_size = args.batch_size
-    task = args.task
+    # task = args.task
     early_stop_patience = args.early_stop
 
     # setup model
@@ -93,8 +92,7 @@ def main():
                               predicator_hidden_feats=predicator_hidden_feats,
                               predicator_dropout=predicator_dropout, n_out=n_out)
         preds = model(node_feats, adj, is_training)
-        logits = clipped_sigmoid(preds)
-        return logits
+        return preds
 
     model = hk.transform_with_state(forward)
     optimizer = optix.adam(learning_rate=lr)
@@ -104,7 +102,7 @@ def main():
         """Compute the loss."""
         inputs, targets = batch
         logits, new_state = model.apply(params, state, next(rng_seq), *inputs, True)
-        loss = binary_cross_entropy(logits, targets)
+        loss = bce_with_logits(logits, targets)
         return loss, new_state
 
     # define training update
@@ -123,11 +121,11 @@ def main():
         """Compute evaluate metrics."""
         inputs, targets = batch
         logits, _ = model.apply(params, state, next(rng_seq), *inputs, False)
-        loss = binary_cross_entropy(logits, targets)
+        loss = bce_with_logits(logits, targets)
         return logits, loss, targets
 
     print("Starting training...")
-    task_index = tox21_tasks.index(task)
+    # task_index = tox21_tasks.index(task)
     early_stop = EarlyStopping(patience=early_stop_patience)
     batch_init_data = (
         np.zeros((batch_size, *train_dataset.X[0][1].shape)),
@@ -140,14 +138,14 @@ def main():
         # train
         start_time = time.time()
         for original_batch in train_dataset.iterbatches(batch_size=batch_size):
-            batch = collate_fn(original_batch, task_index)
+            batch = collate_fn(original_batch)
             params, state, opt_state = update(params, state, opt_state, batch)
         epoch_time = time.time() - start_time
 
         # valid
         y_score, y_true, valid_loss = [], [], []
         for original_batch in valid_dataset.iterbatches(batch_size=batch_size):
-            batch = collate_fn(original_batch, task_index)
+            batch = collate_fn(original_batch)
             logits, loss, targets = evaluate(params, state, batch)
             y_score.extend(logits), valid_loss.append(loss), y_true.extend(targets)
         score = roc_auc_score(y_true, y_score)
@@ -165,7 +163,7 @@ def main():
     y_score, y_true = [], []
     best_checkpoints = early_stop.best_checkpoints
     for original_batch in test_dataset.iterbatches(batch_size=batch_size):
-        batch = collate_fn(original_batch, task_index)
+        batch = collate_fn(original_batch)
         logits, _, targets = evaluate(*best_checkpoints, batch)
         y_score.extend(logits), y_true.extend(targets)
     score = roc_auc_score(y_true, y_score)

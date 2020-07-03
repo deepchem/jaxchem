@@ -2,7 +2,7 @@ import unittest
 
 import pytest
 import numpy as np
-from jaxchem.models.nn import pad_graph_pooling, sparse_graph_pooling
+from jaxchem.models.readout import pad_graph_pooling, sparse_graph_pooling
 
 
 class TestGraphPooling(unittest.TestCase):
