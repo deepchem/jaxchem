@@ -13,28 +13,19 @@ RUN MINICONDA="Miniconda3-latest-Linux-x86_64.sh" && \
     echo ". /miniconda/etc/profile.d/conda.sh" >> ~/.bashrc
 ENV PATH /miniconda/bin:$PATH
 
-# install deepchem with master branch
+# install dependencies
 RUN conda update -n base conda && \
-    git clone --depth 1 https://github.com/deepchem/deepchem.git && \
-    cd deepchem && \
+    conda create -y -n jaxchem python=3.6 && \
     . /miniconda/etc/profile.d/conda.sh && \
-    bash scripts/install_deepchem_conda.sh deepchem && \
-    conda activate deepchem && \
-    python setup.py install && \
-    conda clean -afy && \
-    rm -rf ~/.cache/pip && \
-    rm -rf .git
-
-# install jaxchem dependencies
-RUN . /miniconda/etc/profile.d/conda.sh && \
-    conda activate deepchem && \
+    conda activate jaxchem && \
     PYTHON_VERSION=cp36 && \
     CUDA_VERSION=cuda101 && \
     PLATFORM=linux_x86_64 && \
     BASE_URL='https://storage.googleapis.com/jax-releases' && \
     pip install --upgrade $BASE_URL/$CUDA_VERSION/jaxlib-0.1.47-$PYTHON_VERSION-none-$PLATFORM.whl && \
-    pip install --upgrade jax && \
-    pip install git+https://github.com/deepmind/dm-haiku typing-extensions && \
+    pip install --upgrade jax==0.1.69 && \
+    pip install git+https://github.com/deepchem/jaxchem && \
+    pip install tensorflow==2.2 git+https://github.com/deepchem/deepchem && \
     rm -rf ~/.cache/pip
 
 RUN echo "conda activate deepchem" >> ~/.bashrc
