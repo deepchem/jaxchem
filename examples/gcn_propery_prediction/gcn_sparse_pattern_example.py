@@ -21,7 +21,7 @@ from jaxchem.utils import EarlyStopping
 
 
 # type definition
-Batch = Tuple[Tuple[jnp.ndarray, jnp.ndarray], jnp.ndarray]
+Batch = Tuple[Tuple[np.ndarray, np.ndarray], np.ndarray]
 State, OptState = Any, Any
 
 
@@ -29,7 +29,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser('Tox21 example')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--batch-size', type=int, default=64)
-    parser.add_argument('--epochs', type=int, default=50)
+    parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--early-stop', type=int, default=10)
     return parser.parse_args()
@@ -41,7 +41,7 @@ def seed_everything(seed: int = 42):
     np.random.seed(seed)
 
 
-def collate_fn(original_batch: Any) -> Tuple[Batch, jnp.ndarray]:
+def collate_fn(original_batch: Any) -> Tuple[Batch, np.ndarray]:
     """Make batch data as SparseGCN model inputs."""
     inputs, targets, _, idx = original_batch
     batch_size = len(inputs)
@@ -55,9 +55,9 @@ def collate_fn(original_batch: Any) -> Tuple[Batch, jnp.ndarray]:
             dest_idx.extend(np.array(edge) + total_n_atom)
         graph_idx.extend([i] * inputs[i].n_atoms)
         total_n_atom += inputs[i].n_atoms
-    edge_list = jnp.array([src_idx, dest_idx], dtype=np.int32)
-    graph_idx = jnp.array(graph_idx, dtype=np.int32)
-    return ((node_feats, edge_list), jnp.array(targets)), graph_idx
+    edge_list = np.array([src_idx, dest_idx], dtype=np.int32)
+    graph_idx = np.array(graph_idx, dtype=np.int32)
+    return ((node_feats, edge_list), np.array(targets)), graph_idx
 
 
 def multi_task_roc_auc_score(y_true: np.ndarray, y_score: np.ndarray) -> Tuple[float, List[float]]:
@@ -95,7 +95,7 @@ def main():
     early_stop_patience = args.early_stop
 
     # setup model
-    def forward(node_feats: jnp.ndarray, adj: jnp.ndarray, graph_idx: jnp.ndarray,
+    def forward(node_feats: np.ndarray, adj: np.ndarray, graph_idx: np.ndarray,
                 is_training: bool) -> jnp.ndarray:
         """Forward application of the GCN."""
         model = GCNPredicator(in_feats=in_feats, hidden_feats=hidden_feats, activation=activation,
@@ -110,7 +110,7 @@ def main():
 
     # define training loss
     def train_loss(params: hk.Params, state: State, batch: Batch,
-                   graph_idx: jnp.ndarray) -> Tuple[jnp.ndarray, State]:
+                   graph_idx: jnp.ndarray) -> Tuple[float, State]:
         """Compute the loss."""
         inputs, targets = batch
         preds, new_state = model.apply(params, state, next(rng_seq), *inputs, graph_idx, True)
@@ -130,7 +130,7 @@ def main():
     # define evaluate metrics
     @partial(jax.jit, static_argnums=(3,))
     def evaluate(params: hk.Params, state: State, batch: Batch,
-                 graph_idx: jnp.ndarray) -> jnp.ndarray:
+                 graph_idx: np.ndarray) -> Tuple[jnp.ndarray, float, np.ndarray]:
         """Compute evaluate metrics."""
         inputs, targets = batch
         preds, _ = model.apply(params, state, next(rng_seq), *inputs, graph_idx, False)

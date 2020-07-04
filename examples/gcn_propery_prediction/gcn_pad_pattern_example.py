@@ -20,7 +20,7 @@ from jaxchem.utils import EarlyStopping
 
 
 # type definition
-Batch = Tuple[Tuple[jnp.ndarray, jnp.ndarray], jnp.ndarray]
+Batch = Tuple[Tuple[np.ndarray, np.ndarray], np.ndarray]
 State, OptState = Any, Any
 
 
@@ -28,7 +28,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser('Multitask Learning with Tox21.')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--batch-size', type=int, default=64)
-    parser.add_argument('--epochs', type=int, default=50)
+    parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--early-stop', type=int, default=10)
     return parser.parse_args()
@@ -83,7 +83,7 @@ def main():
     early_stop_patience = args.early_stop
 
     # setup model
-    def forward(node_feats: jnp.ndarray, adj: jnp.ndarray, is_training: bool) -> jnp.ndarray:
+    def forward(node_feats: np.ndarray, adj: np.ndarray, is_training: bool) -> jnp.ndarray:
         """Forward application of the GCN."""
         model = GCNPredicator(in_feats=in_feats, hidden_feats=hidden_feats, activation=activation,
                               batch_norm=batch_norm, dropout=dropout, pooling_method=pooling_method,
@@ -96,7 +96,7 @@ def main():
     optimizer = optix.adam(learning_rate=lr)
 
     # define training loss
-    def train_loss(params: hk.Params, state: State, batch: Batch) -> Tuple[jnp.ndarray, State]:
+    def train_loss(params: hk.Params, state: State, batch: Batch) -> Tuple[float, State]:
         """Compute the loss."""
         inputs, targets = batch
         preds, new_state = model.apply(params, state, next(rng_seq), *inputs, True)
@@ -115,7 +115,7 @@ def main():
 
     # define evaluate metrics
     @jax.jit
-    def evaluate(params: hk.Params, state: State, batch: Batch) -> jnp.ndarray:
+    def evaluate(params: hk.Params, state: State, batch: Batch) -> Tuple[jnp.ndarray, float, np.ndarray]:
         """Compute evaluate metrics."""
         inputs, targets = batch
         preds, _ = model.apply(params, state, next(rng_seq), *inputs, False)
