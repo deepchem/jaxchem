@@ -10,9 +10,9 @@ def binary_cross_entropy_with_logits(inputs: jnp.ndarray, targets: jnp.ndarray,
 
     Parameters
     ----------
-    inputs : np.ndarray
+    inputs : jnp.ndarray
         This is a model output. This is a value before passing a sigmoid function.
-    targets : np.ndarray
+    targets : jnp.ndarray
         This is a label and the same shape as inputs.
     average : bool
         Whether to mean loss values or sum, default to be True.
