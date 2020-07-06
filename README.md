@@ -21,9 +21,6 @@ First, you have to install JAX. Please confirm how to install JAX [here](https:/
 After installing JAX, please run the following commands.
 
 ```bash
-// install haiku v0.0.1
-$ pip install dm-haiku==0.0.1
-
 // install jaxchem
 $ pip install git+https://github.com/deepchem/jaxchem
 ```
