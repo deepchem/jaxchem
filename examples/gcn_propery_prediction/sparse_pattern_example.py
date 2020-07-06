@@ -45,7 +45,7 @@ def collate_fn(original_batch: Any) -> Tuple[Batch, np.ndarray]:
     """Make batch data as SparseGCN model inputs."""
     inputs, targets, _, idx = original_batch
     batch_size = len(inputs)
-    node_feats = jnp.concatenate([inputs[i].atom_features for i in range(batch_size)], axis=0)
+    node_feats = np.concatenate([inputs[i].atom_features for i in range(batch_size)], axis=0)
     src_idx, dest_idx, graph_idx = [], [], []
     total_n_atom = 0
     for i in range(batch_size):
