@@ -10,7 +10,7 @@ from jaxchem.typing import Pooling
 def pad_graph_pooling(method: Pooling = 'mean') -> Callable[[jnp.ndarray], jnp.ndarray]:
     """Pooling function for pad pattern graph data.
 
-    method : str
+    method : Literal['max', 'min', 'mean', 'sum']
         pooling method name.
 
     Returns
@@ -35,7 +35,7 @@ def pad_graph_pooling(method: Pooling = 'mean') -> Callable[[jnp.ndarray], jnp.n
 def sparse_graph_pooling(method: Pooling = 'mean') -> Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]:
     """Pooling function for sparse pattern graph data.
 
-    method : str
+    method : Literal['max', 'min', 'mean', 'sum']
         pooling method name.
 
     Returns

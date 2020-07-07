@@ -41,6 +41,16 @@ extensions = [
     'sphinx.ext.linkcode', 'sphinx.ext.mathjax',
 ]
 
+autodoc_default_options = {
+    'member-order': 'bysource',
+    'special-members': True,
+    'exclude-members': '__repr__, __str__, __weakref__',
+}
+
+autodoc_typehints = "description"
+
+mathjax_path = 'http://mathjax.connectmv.com/MathJax.js?config=default'
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
@@ -118,6 +128,7 @@ def setup(app):
     def skip(app, what, name, obj, skip, options):
         members = [
             '__init__',
+            '__call__',
         ]
         return False if name in members else skip
 

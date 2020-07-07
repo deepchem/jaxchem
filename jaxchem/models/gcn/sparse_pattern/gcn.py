@@ -10,13 +10,13 @@ from jaxchem.typing import Activation
 
 
 class SparseGCN(hk.Module):
-    """GCN `Semi-Supervised Classification with Graph Convolutional Networks`
-        ref : <https://arxiv.org/abs/1609.02907>
+    """GCN module. Paper: `Semi-Supervised Classification with Graph Convolutional Networks
+    <https://arxiv.org/abs/1609.02907>`_
     """
 
     def __init__(self, in_feats: int, hidden_feats: List[int], activation: Optional[List[Activation]] = None,
                  batch_norm: Optional[List[bool]] = None, dropout: Optional[List[float]] = None,
-                 bias: bool = None, normalize: bool = True, name: Optional[str] = None):
+                 name: Optional[str] = None):
         """Initializes the module.
 
         Parameters

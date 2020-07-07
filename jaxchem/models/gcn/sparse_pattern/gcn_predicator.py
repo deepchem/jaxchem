@@ -17,7 +17,7 @@ class SparseGCNPredicator(hk.Module):
                  batch_norm: Optional[List[bool]] = None, dropout: Optional[List[float]] = None,
                  pooling_method: Pooling = 'mean', predicator_hidden_feats: int = 128,
                  predicator_dropout: float = 0.0, n_out: int = 1,
-                 bias: bool = None, normalize: bool = True, name: Optional[str] = None):
+                 name: Optional[str] = None):
         """Initializes the module.
 
         Parameters
@@ -38,7 +38,7 @@ class SparseGCNPredicator(hk.Module):
             ``dropout[i]`` decides the dropout probability on the output of the i-th GCN layer.
             ``len(dropout)`` equals the number of GCN layers. By default, dropout is not
             performed for all layers.
-        pooling_method : str ('max', 'min', 'mean', 'sum')
+        pooling_method : Literal['max', 'min', 'mean', 'sum']
             pooling method name, default to 'mean'.
         predicator_hidden_feats : int
             Size of hidden graph representations in the predicator, default to 128.
