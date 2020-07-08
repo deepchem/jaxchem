@@ -13,6 +13,7 @@
 #
 import os
 import sys
+import inspect
 sys.path.insert(0, os.path.abspath('../..'))
 
 
@@ -88,16 +89,8 @@ html_theme_options = {
     'display_version': True,
 }
 
-html_context = {
-    "display_github": True,
-    "github_user": "deepchem",
-    "github_repo": "jaxchem",
-    "github_version": "master",
-    "conf_py_path": "/docs/source/",
-}
 
-
-# Thanks to https://github.com/materialsproject/pymatgen/blob/master/docs_rst/conf.py
+# Resolve function for the linkcode extension.
 def linkcode_resolve(domain, info):
     def find_source():
         # try to find the file and line number, based on code from numpy:
@@ -105,22 +98,19 @@ def linkcode_resolve(domain, info):
         obj = sys.modules[info['module']]
         for part in info['fullname'].split('.'):
             obj = getattr(obj, part)
-        import inspect
-        import os
         fn = inspect.getsourcefile(obj)
-        fn = os.path.relpath(fn, start=os.path.dirname(__file__))
+        fn = os.path.relpath(fn, start=os.path.dirname(jaxchem.__file__))
         source, lineno = inspect.getsourcelines(obj)
         return fn, lineno, lineno + len(source) - 1
 
     if domain != 'py' or not info['module']:
         return None
-
     try:
         filename = 'jaxchem/%s#L%d-L%d' % find_source()
-    except:
+    except Exception:
         filename = info['module'].replace('.', '/') + '.py'
 
-    tag = 'v' + jaxchem.__version__
+    tag = 'master' if 'dev' in release else ('v' + release)
     return "https://github.com/deepchem/jaxchem/blob/%s/%s" % (tag, filename)
 
 
