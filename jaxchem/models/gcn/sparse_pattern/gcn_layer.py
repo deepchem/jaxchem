@@ -11,8 +11,8 @@ from jaxchem.typing import Activation
 
 
 class SparseGCNLayer(hk.Module):
-    """Single GCN layer from `Semi-Supervised Classification with Graph Convolutional Networks`
-        ref : <https://arxiv.org/abs/1609.02907>
+    """Single GCN layer from `Semi-Supervised Classification
+    with Graph Convolutional Networks <https://arxiv.org/abs/1609.02907>`_
     """
 
     def __init__(self, in_feats: int, out_feats: int, activation: Optional[Activation] = None,

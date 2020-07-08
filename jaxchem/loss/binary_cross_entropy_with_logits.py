@@ -6,7 +6,8 @@ def binary_cross_entropy_with_logits(inputs: jnp.ndarray, targets: jnp.ndarray,
     """Binary cross entropy loss.
 
     This function is based on the PyTorch implemantation.
-    see : https://discuss.pytorch.org/t/numerical-stability-of-bcewithlogitsloss/8246
+
+    See : https://discuss.pytorch.org/t/numerical-stability-of-bcewithlogitsloss/8246
 
     Parameters
     ----------

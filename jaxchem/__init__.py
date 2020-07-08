@@ -3,4 +3,4 @@ from jaxchem import models
 from jaxchem import utils
 from jaxchem.typing import Activation, Pooling
 
-__version__ = "0.0.1"
+__version__ = "0.0.1.dev1"

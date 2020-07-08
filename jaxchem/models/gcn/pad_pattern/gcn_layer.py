@@ -10,8 +10,8 @@ from jaxchem.typing import Activation
 
 
 class PadGCNLayer(hk.Module):
-    """Single GCN layer from `Semi-Supervised Classification with Graph Convolutional Networks`
-        ref : <https://arxiv.org/abs/1609.02907>
+    """Single GCN layer from `Semi-Supervised Classification
+    with Graph Convolutional Networks <https://arxiv.org/abs/1609.02907>`_
     """
 
     def __init__(self, in_feats: int, out_feats: int, activation: Optional[Activation] = None,
@@ -91,11 +91,15 @@ class PadGCNLayer(hk.Module):
         """Function of updating node features with no batch data.
 
         The case adjacency matrix is normalized,
+
         .. math::
+
             H^{(l+1)} = \sigma(\tilde{D}^{-\frac{1}{2}}\tilde{A}\tilde{D}^{-\frac{1}{2}}H^{(l)}W^{(l)})
 
         The case adjacency matrix is not normalized,
+
         .. math::
+
             H^{(l+1)} = \sigma(AH^{(l)}W^{(l)})
 
         Parameters

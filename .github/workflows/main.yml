@@ -24,7 +24,8 @@ jobs:
         python -m pip install --upgrade pip
         pip install --upgrade jax==0.1.69 jaxlib==0.1.47
         pip install -r requirements.txt
-        pip install -r requirements-test.txt
+        pip install -r requirements-tests.txt
+        pip install -r requirements-docs.txt
     - name: Build jaxchem
       run: |
         python setup.py install
@@ -37,3 +38,6 @@ jobs:
     - name: Test with pytest
       run: |
         pytest -v --cov=jaxchem
+    - name: Build documents
+      run: |
+          cd docs && make html
