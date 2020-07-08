@@ -1,0 +1,10 @@
+version: 2
+formats: all
+python:
+  version: 3.6
+  install:
+    - requirements: requirements.txt
+    - requirements: requirements-jax.txt
+    - requirements: requirements-docs.txt
+sphinx:
+  configuration: docs/source/conf.py
