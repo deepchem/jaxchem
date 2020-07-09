@@ -1,6 +1,9 @@
 # JAXChem
 
 [![](https://github.com/deepchem/jaxchem/workflows/main/badge.svg)](https://github.com/deepchem/jaxchem/actions?query=workflow%3Amain)
+[![Documentation Status](https://readthedocs.org/projects/jaxchem/badge/?version=latest)](https://jaxchem.readthedocs.io/en/latest/?badge=latest)
+
+[Documentation](https://jaxchem.readthedocs.io/en/latest/)
 
 JAXChem is a JAX-based deep learning library for complex and versatile chemical modelings.  
 We welcome to contribute any chemical modelings with JAX.
