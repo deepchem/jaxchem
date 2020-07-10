@@ -25,7 +25,10 @@ RUN conda update -n base conda && \
     pip install --upgrade $BASE_URL/$CUDA_VERSION/jaxlib-0.1.47-$PYTHON_VERSION-none-$PLATFORM.whl && \
     pip install --upgrade jax==0.1.69 && \
     pip install git+https://github.com/deepchem/jaxchem && \
-    pip install tensorflow==2.2 deepchem-nightly && \
+    pip install tensorflow==2.2 && \
+    pip install --pre deepchem && \
+    conda install -y -c conda-forge rdkit && \
+    conda clean -afy && \
     rm -rf ~/.cache/pip
 
 RUN echo "conda activate jaxchem" >> ~/.bashrc

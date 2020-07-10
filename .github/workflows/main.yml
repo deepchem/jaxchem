@@ -40,4 +40,4 @@ jobs:
         pytest -v --cov=jaxchem
     - name: Build documents
       run: |
-          cd docs && make html
+        cd docs && make html
