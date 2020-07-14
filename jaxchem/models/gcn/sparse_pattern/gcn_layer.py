@@ -4,7 +4,7 @@ import numpy as np
 import haiku as hk
 import jax
 import jax.numpy as jnp
-from jax.ops import index_add
+from jax.ops import segment_sum
 
 
 from jaxchem.typing import Activation
@@ -75,24 +75,35 @@ class SparseGCNLayer(hk.Module):
             Batch new node features.
         """
         dropout = self.dropout if is_training is True else 0.0
+        num_nodes = node_feats.shape[0]
 
         # affine transformation
         new_node_feats = jnp.dot(node_feats, self.w)
-
-        # aggregate
-        if self.normalize:
-            src_idx, dest_idx = adj[0], adj[1]
-            degree = index_add(jnp.zeros(len(new_node_feats)), src_idx, 1).reshape(-1, 1)
-            degree = jnp.where(degree == 0., 1., degree)
-            new_node_feats = new_node_feats / jnp.sqrt(degree)
-            new_node_feats = index_add(new_node_feats, [dest_idx], new_node_feats[src_idx])
-            new_node_feats = new_node_feats / jnp.sqrt(degree)
-        else:
-            src_idx, dest_idx = adj[0], adj[1]
-            new_node_feats = index_add(new_node_feats, [dest_idx], new_node_feats[src_idx])
-
         if self.bias:
             new_node_feats += self.b
+
+        # update nodes
+        if self.normalize:
+            # add self connection
+            self_loop = jnp.tile(jnp.arange(num_nodes), (2, 1))
+            adj = jnp.concatenate((adj, self_loop), axis=1)
+            src_idx, dest_idx = adj[0], adj[1]
+
+            # calculate the norm
+            degree = segment_sum(jnp.ones(len(dest_idx)), dest_idx, num_segments=num_nodes)
+            degree = jnp.where(degree == 0., 1., degree)
+            deg_inv_sqrt = jax.lax.pow(degree, -0.5)
+            norm = deg_inv_sqrt[src_idx] * deg_inv_sqrt[dest_idx]
+
+            # update nodes
+            source_feats = jnp.take(new_node_feats, src_idx, axis=0)
+            source_feats = norm.reshape(-1, 1) * source_feats
+            new_node_feats = segment_sum(source_feats, dest_idx, num_segments=num_nodes)
+        else:
+            src_idx, dest_idx = adj[0], adj[1]
+            source_feats = jnp.take(new_node_feats, src_idx, axis=0)
+            aggregated_messages = segment_sum(source_feats, dest_idx, num_segments=num_nodes)
+            new_node_feats = jnp.add(aggregated_messages, new_node_feats)
 
         new_node_feats = self.activation(new_node_feats)
 
