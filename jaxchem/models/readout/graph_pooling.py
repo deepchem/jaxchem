@@ -1,7 +1,7 @@
 from typing import Callable
 
 import jax.numpy as jnp
-from jax.ops import index_add, index_min, index_max
+from jax.ops import segment_sum, index_max, index_min
 
 
 from jaxchem.typing import Pooling
@@ -71,11 +71,12 @@ def sparse_mean_pooling(node_feats: jnp.ndarray, graph_idx: jnp.ndarray) -> jnp.
     ndarray of shape (batch_size, in_feats)
         Batch graph features.
     """
-    _, feat_dim = node_feats.shape
+    num_nodes = node_feats.shape[0]
     batch_size = graph_idx[-1] + 1
-    n_atom = index_add(jnp.zeros(batch_size), graph_idx, 1).reshape(-1, 1)
-    init_matrix = jnp.zeros((batch_size, feat_dim))
-    return index_add(init_matrix, graph_idx, node_feats) / n_atom
+    n_atom = segment_sum(jnp.ones(num_nodes), graph_idx, num_segments=batch_size)
+    n_atom = jnp.expand_dims(n_atom, 1)
+    sum_nodes = segment_sum(node_feats, graph_idx, num_segments=batch_size)
+    return sum_nodes / n_atom
 
 
 def sparse_sum_pooling(node_feats: jnp.ndarray, graph_idx: jnp.ndarray) -> jnp.ndarray:
@@ -93,10 +94,8 @@ def sparse_sum_pooling(node_feats: jnp.ndarray, graph_idx: jnp.ndarray) -> jnp.n
     ndarray of shape (batch_size, in_feats)
         Batch graph features.
     """
-    _, feat_dim = node_feats.shape
     batch_size = graph_idx[-1] + 1
-    init_matrix = jnp.zeros((batch_size, feat_dim))
-    return index_add(init_matrix, graph_idx, node_feats)
+    return segment_sum(node_feats, graph_idx, num_segments=batch_size)
 
 
 def sparse_max_pooling(node_feats: jnp.ndarray, graph_idx: jnp.ndarray) -> jnp.ndarray:

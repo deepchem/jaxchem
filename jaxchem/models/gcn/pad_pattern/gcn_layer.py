@@ -75,7 +75,7 @@ class PadGCNLayer(hk.Module):
         dropout = self.dropout if is_training is True else 0.0
 
         # for batch data
-        new_node_feats = jax.vmap(self.__update_func)(node_feats, adj)
+        new_node_feats = jax.vmap(self._update_nodes)(node_feats, adj)
         if self.bias:
             new_node_feats += self.b
         new_node_feats = self.activation(new_node_feats)
@@ -87,7 +87,7 @@ class PadGCNLayer(hk.Module):
 
         return new_node_feats
 
-    def __update_func(self, node_feats: jnp.ndarray, adj: jnp.ndarray) -> jnp.ndarray:
+    def _update_nodes(self, node_feats: jnp.ndarray, adj: jnp.ndarray) -> jnp.ndarray:
         """Function of updating node features with no batch data.
 
         The case adjacency matrix is normalized,
