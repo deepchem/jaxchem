@@ -91,7 +91,6 @@ class SparseGCNLayer(hk.Module):
 
             # calculate the norm
             degree = segment_sum(jnp.ones(len(dest_idx)), dest_idx, num_segments=num_nodes)
-            degree = jnp.where(degree == 0., 1., degree)
             deg_inv_sqrt = jax.lax.pow(degree, -0.5)
             norm = deg_inv_sqrt[src_idx] * deg_inv_sqrt[dest_idx]
 
